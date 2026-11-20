@@ -471,14 +471,14 @@ function wajdReadingSetup(){
   const complete=document.createElement('section');
   complete.className='wajd-reading-complete';
   complete.setAttribute('aria-live','polite');
-  complete.innerHTML='<span><strong>إكمال القراءة</strong><small>تُسجّل المقالة مكتملة تلقائيًا عند وصولك إلى نهايتها، أو يمكنك تأكيدها يدويًا.</small></span><button type="button">أكملت القراءة</button>';
+  complete.innerHTML='<span><strong>إكمال القراءة</strong><small>تُسجّل المقالة مكتملة تلقائيًا حين تصل إلى نهايتها بعد قراءتها، أو يمكنك تأكيدها يدويًا.</small></span><button type="button">أكملت القراءة</button>';
   const anchor=document.getElementById('wajd-like-panel');
   if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(complete,anchor);
   else body.insertAdjacentElement('afterend',complete);
   const completeButton=complete.querySelector('button');
   const completeTitle=complete.querySelector('strong');
   const completeHint=complete.querySelector('small');
-  const renderComplete=()=>{completeButton.classList.toggle('is-complete',completed);completeButton.textContent=completed?'اكتملت القراءة ✓':'أكملت القراءة';completeTitle.textContent=completed?'اكتملت قراءة المقال':'إكمال القراءة';completeHint.textContent=completed?'تم حفظها ضمن القراءات المكتملة في سجلك.':'تُسجّل المقالة مكتملة تلقائيًا عند وصولك إلى نهايتها، أو يمكنك تأكيدها يدويًا.';};
+  const renderComplete=()=>{completeButton.classList.toggle('is-complete',completed);completeButton.textContent=completed?'اكتملت القراءة ✓':'أكملت القراءة';completeTitle.textContent=completed?'اكتملت قراءة المقال':'إكمال القراءة';completeHint.textContent=completed?'تم حفظها ضمن القراءات المكتملة في سجلك.':'تُسجّل المقالة مكتملة تلقائيًا حين تصل إلى نهايتها بعد قراءتها، أو يمكنك تأكيدها يدويًا.';};
   const metrics=()=>{
     const rect=body.getBoundingClientRect();
     const start=window.scrollY+rect.top;
@@ -517,8 +517,13 @@ function wajdReadingSetup(){
     lastSavedAt=Date.now();
     return true;
   };
-  const completeAtArticleEnd=current=>{
-    if(completed||!activeGoogleUser()||current.progress<.9995)return false;
+  // v120: one definition of "completed" everywhere. core.js decides it (end reached + enough time with
+  // the text on screen) and announces it; the Google reading history follows that instead of
+  // completing as soon as the reader scrolls to the end.
+  const readingCompleted=()=>Boolean(window.wajdCompletedArticleIds&&window.wajdCompletedArticleIds.has(String(postId)));
+  window.addEventListener('wajd-article-completed',event=>{if(event.detail&&String(event.detail.articleId)===String(postId))completeAtArticleEnd();});
+  const completeAtArticleEnd=()=>{
+    if(completed||!activeGoogleUser()||!readingCompleted())return false;
     completed=true;renderComplete();
     saveProgress(true).then(saved=>{
       if(saved){if(window.wajdAudienceRecordExplicitAction)window.wajdAudienceRecordExplicitAction('completed',postId);else if(window.wajdJourneyRecordAction)window.wajdJourneyRecordAction('completed',postId);}

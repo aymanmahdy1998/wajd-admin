@@ -2314,8 +2314,14 @@ function wajdJourneySample(tracker, activeOverride) {
       const urls = JSON.parse(localStorage.getItem(pathKey) || '[]');
       const here = decodeURIComponent(new URL(visit.base.pageUrl).pathname).replace(/\/$/, '');
       if (Array.isArray(urls) && !urls.includes(here)) { urls.push(here); localStorage.setItem(pathKey, JSON.stringify(urls.slice(-500))); }
-      window.dispatchEvent(new CustomEvent('wajd-article-completed', { detail:{ articleId:visit.base.articleId, path:here } }));
     } catch (error) {}
+    // v120: this is the single definition of "completed". The Google reading history (account.js) and
+    // reading paths listen to it, so every count uses the same rule (end reached + enough reading time).
+    let completedPath = '';
+    try { completedPath = decodeURIComponent(new URL(visit.base.pageUrl).pathname).replace(/\/$/, ''); } catch (error) {}
+    window.wajdCompletedArticleIds = window.wajdCompletedArticleIds || new Set();
+    window.wajdCompletedArticleIds.add(String(visit.base.articleId));
+    window.dispatchEvent(new CustomEvent('wajd-article-completed', { detail:{ articleId:visit.base.articleId, path:completedPath } }));
     tracker.completedArticles = Math.max(tracker.completedArticles, wajdLocalCompletedRead(tracker.user.uid).length);
     tracker.lastCompleted = true; tracker.dirtyRevision++;
     window.setTimeout(() => wajdAudienceFlush(false).catch(error => console.warn('Wajd audience completion:', error)), 0);
