@@ -490,7 +490,8 @@ function wajdAdminBehaviorData() {
     else if (seconds < 30 && pages <= 1) engagement.quick += 1;
     else engagement.steady += 1;
     const entryTitle = String(data.entryPageTitle || 'صفحة غير معروفة'), entryUrl = String(data.entryPageUrl || '');
-    const entryKey = entryUrl || entryTitle;
+    // Same page reached as ?m=1, with share tags or a #fragment counts once.
+    const entryKey = entryUrl ? entryUrl.replace(/reading-path=/.test(entryUrl) ? /#.*$/ : /[?#].*$/,'').replace(/^https?:\/\/(www\.)?/i,'').replace(/\/$/,'').toLowerCase() : entryTitle;
     const entry = entries.get(entryKey) || { title:entryTitle, url:entryUrl, count:0 };
     entry.count += 1; entries.set(entryKey, entry);
   });
