@@ -6,7 +6,7 @@ const WAJD_EXTRAS_CSS = `
 .wajd-home-topics::-webkit-scrollbar{display:none}
 .wajd-home-topics a{flex:0 0 auto;padding:8px 14px;border:1px solid var(--wajd-line);border-radius:999px;background:#fffaf5;color:var(--wajd-ink)!important;font:600 13.5px/1.3 Tajawal,sans-serif;text-decoration:none;white-space:nowrap}
 .wajd-home-topics a:active{background:var(--wajd-accent);color:#fff!important}
-@media(max-width:720px){.wajd-home-topics{display:flex}}
+@media(max-width:1023px){.wajd-home-topics{display:flex}}
 .wajd-home-author{display:flex;align-items:center;gap:16px;margin:26px 0 8px;padding:18px;border:1px solid var(--wajd-line);border-radius:16px;background:#fffaf5}
 .wajd-home-author img{flex:0 0 auto;width:68px;height:68px;border-radius:50%;object-fit:cover;border:2px solid var(--wajd-line)}
 .wajd-home-author small{display:block;color:var(--wajd-muted);font:600 12px Tajawal,sans-serif;margin-bottom:2px}
