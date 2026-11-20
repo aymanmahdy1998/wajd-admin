@@ -1583,13 +1583,19 @@ async function wajdAudienceRecoverPending(tracker, rows) {
         }
       }
       const recoveryRef = doc(wajdSavedDb,'audienceRecoveryDeltas',tracker.user.uid + '_' + row.id);
-      await runTransaction(wajdSavedDb, async transaction => {
-        if ((await transaction.get(recoveryRef)).exists()) return;
-        transaction.set(recoveryRef, {
+      // v119: plain create instead of a transaction. The transaction read a doc that
+      // does not exist yet, which the rules refuse (403) and which left the Firestore
+      // SDK's write stream in a broken state (INTERNAL ASSERTION da08) for the page.
+      // The rules allow create only, so a retry of an already-saved row is refused:
+      // that means it is recorded, and the row is dropped below.
+      try {
+        await setDoc(recoveryRef, {
           schemaVersion:106, userId:tracker.user.uid, sourceUserId, deltaKey:row.id, sessionId:String(row.sessionId).slice(0,80),
           activeSeconds:Math.min(300,Math.max(1,Math.floor(Number(row.seconds)||1))), recordedAt:new Date(Number(row.updatedAt)||Date.now()), recoveredAt:serverTimestamp()
         });
-      });
+      } catch (createError) {
+        if (!/permission-denied/.test(String(createError && createError.code || ''))) throw createError;
+      }
       wajdAudiencePendingRemove(tracker.user.uid,row.id);
     } catch (error) {
       wajdAnalyticsHandleError(error);
@@ -2177,8 +2183,14 @@ function wajdJourneyDepth() {
   if (!(height > 0) || rect.top >= window.innerHeight) return 0;
   // This is visible depth in THIS visit, not the reader's restored history value.
   if (rect.bottom <= window.innerHeight + 1) {
-    // Hidden images (offsetParent null) never load and must not block the end.
-    const unresolved = body.querySelectorAll && Array.from(body.querySelectorAll('img')).some(img => !img.complete && img.offsetParent !== null && img.getBoundingClientRect().height < 2);
+    // Only a collapsed image still on screen or below can make the end look reached
+    // too early. Hidden images (offsetParent null) and images the reader already
+    // scrolled past (e.g. a lead image that failed to load) must not block the end.
+    const unresolved = body.querySelectorAll && Array.from(body.querySelectorAll('img')).some(img => {
+      if (img.complete || img.offsetParent === null) return false;
+      const box = img.getBoundingClientRect();
+      return box.height < 2 && box.bottom >= 0;
+    });
     return unresolved ? .999 : 1;
   }
   return Math.max(0, Math.min(.999, Math.round((window.innerHeight - rect.top) / height * 1000) / 1000));
