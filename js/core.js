@@ -269,6 +269,7 @@ const WAJD_AUDIENCE_READING_IDLE_TIMEOUT = 3 * 60 * 1000;
 // because the save on leaving the page often never reaches Firestore.
 const WAJD_JOURNEY_SAVE_INTERVAL = 60 * 1000;
 const WAJD_COMPLETED_ARTICLES_PREFIX = 'wajd-completed-articles-v119:';
+const WAJD_JOURNEY_UNSENT_PREFIX = 'wajd-journey-unsent-v119:';
 const WAJD_NOTIFICATIONS_REFRESH_INTERVAL = 2 * 60 * 1000;
 let wajdAudienceTracker = null;
 let wajdAudienceStartPromise = null;
@@ -2055,6 +2056,7 @@ async function wajdAudienceStart(user, options) {
       wajdAudienceBindLifecycle();
       wajdJourneyBegin(tracker);
       if (wajdAnalyticsCanWrite()) wajdRecoverEarlyEntries(tracker).catch(error => console.warn('Wajd early entries:', error));
+      if (wajdAnalyticsCanWrite()) wajdJourneyRecoverUnsent(tracker).catch(error => console.warn('Wajd journey unsent:', error));
       wajdJourneyBindLifecycle();
       return true;
     } catch (error) {
@@ -2324,6 +2326,7 @@ async function wajdJourneyFlush(visit) {
     visit.lastFlushAt = Date.now();
     if (activeSeconds >= Math.floor(visit.active) && readingSeconds >= Math.floor(visit.reading)) visit.sentRevision = revision;
     else visit.again = true;
+    if (visit.sentRevision === visit.revision) wajdJourneyClearUnsent(visit);
   })();
   try { await visit.promise; }
   finally {
@@ -2338,7 +2341,71 @@ function wajdJourneyEnd(tracker, reason) {
   if (!visit || visit.endReason) return;
   wajdJourneySample(tracker);
   visit.endReason = reason; visit.revision++;
+  wajdJourneyStashUnsent(visit);
   wajdJourneyQueue(visit);
+}
+
+/* v119: a Firestore write started while the page is closing usually never
+   arrives. Keep the latest numbers locally (synchronous, so it survives) and
+   send them from the reader's next page view. */
+
+function wajdJourneyUnsentRead(uid) {
+  try {
+    const rows = JSON.parse(localStorage.getItem(WAJD_JOURNEY_UNSENT_PREFIX + uid) || '[]');
+    return Array.isArray(rows) ? rows.filter(row => row && typeof row.id === 'string' && Date.now() - Number(row.at) < 7 * 86400000).slice(-6) : [];
+  } catch (error) { return []; }
+}
+
+function wajdJourneyUnsentWrite(uid, rows) {
+  try {
+    if (rows.length) localStorage.setItem(WAJD_JOURNEY_UNSENT_PREFIX + uid, JSON.stringify(rows.slice(-6)));
+    else localStorage.removeItem(WAJD_JOURNEY_UNSENT_PREFIX + uid);
+  } catch (error) {}
+}
+
+function wajdJourneyStashUnsent(visit) {
+  if (!visit || visit.disabled || !visit.created || visit.sentRevision === visit.revision) return;
+  const uid = visit.base.userId;
+  const rows = wajdJourneyUnsentRead(uid).filter(row => row.id !== visit.id);
+  rows.push({ id:visit.id, at:Date.now(), active:Math.floor(visit.active), reading:Math.floor(visit.reading), maxProgress:visit.maxProgress,
+    completed:visit.completed, saved:visit.saved, liked:visit.liked, commented:visit.commented, endReason:visit.endReason || '' });
+  wajdJourneyUnsentWrite(uid, rows);
+}
+
+function wajdJourneyClearUnsent(visit) {
+  const uid = visit.base.userId;
+  const rows = wajdJourneyUnsentRead(uid);
+  if (rows.some(row => row.id === visit.id)) wajdJourneyUnsentWrite(uid, rows.filter(row => row.id !== visit.id));
+}
+
+async function wajdJourneyRecoverUnsent(tracker) {
+  const uid = tracker.user.uid, current = tracker.journey && tracker.journey.id;
+  const rows = wajdJourneyUnsentRead(uid).filter(row => row.id !== current);
+  for (const row of rows.slice(0, 3)) {
+    try {
+      const ref = doc(wajdSavedDb, WAJD_JOURNEY_COLLECTION, row.id);
+      const snapshot = await getDoc(ref);
+      const stored = snapshot.exists() ? snapshot.data() : null;
+      if (stored && stored.userId === uid && stored.recovered !== true) {
+        const activeSeconds = Math.max(stored.activeSeconds, Math.min(row.active, stored.activeSeconds + 300));
+        const readingSeconds = Math.min(activeSeconds, Math.max(stored.readingSeconds, Math.min(row.reading, stored.readingSeconds + 300)));
+        const maxProgress = Math.max(Number(stored.maxProgress) || 0, Math.min(1, Number(row.maxProgress) || 0));
+        await setDoc(ref, { updatedAt:serverTimestamp(), activeSeconds, readingSeconds, maxProgress, reachedEnd:maxProgress === 1,
+          completed:stored.completed || row.completed === true, saved:stored.saved || row.saved === true,
+          liked:stored.liked || row.liked === true, commented:stored.commented || row.commented === true,
+          // Only close the visit if it was really closed; a merely hidden tab may still be open.
+          endReason:stored.endReason || (['pagehide','session','identity'].includes(row.endReason) ? row.endReason : '') }, { merge:true });
+      }
+      wajdJourneyUnsentWrite(uid, wajdJourneyUnsentRead(uid).filter(item => item.id !== row.id));
+    } catch (error) {
+      wajdAnalyticsHandleError(error);
+      const code = String(error && error.code || '');
+      // Rules refused it (e.g. data too old to reconcile): drop it, don't retry forever.
+      if (/permission-denied|invalid-argument/.test(code)) wajdJourneyUnsentWrite(uid, wajdJourneyUnsentRead(uid).filter(item => item.id !== row.id));
+      console.warn('Wajd journey unsent recovery:', code || 'network');
+      if (!wajdAnalyticsCanWrite()) break;
+    }
+  }
 }
 
 window.wajdJourneyRecordAction = function(action, articleId) {
@@ -2381,7 +2448,10 @@ function wajdJourneyBindLifecycle() {
     wajdJourneySample(tracker);
     // v119: save the visit when the page is hidden (app switch, tab close on
     // phones). The visit stays open, so returning keeps adding to it.
-    if (document.visibilityState === 'hidden' && tracker && tracker.journey && !tracker.stopped) wajdJourneyQueue(tracker.journey);
+    if (document.visibilityState === 'hidden' && tracker && tracker.journey && !tracker.stopped) {
+      wajdJourneyStashUnsent(tracker.journey);
+      wajdJourneyQueue(tracker.journey);
+    }
   });
   window.addEventListener('pagehide', () => wajdJourneyEnd(wajdAudienceTracker, 'pagehide'));
   window.addEventListener('pageshow', event => {
