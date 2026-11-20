@@ -474,9 +474,12 @@ function wajdAdminBehaviorData() {
   const visitors = new Map(), sources = new Map(), devices = new Map(), browsers = new Map(), systems = new Map(), campaigns = new Map(), entries = new Map();
   const engagement = { quick:0, steady:0, deep:0 };
   const cohorts = { anonymous:{sessions:0,activeSeconds:0,pageViews:0}, registered:{sessions:0,activeSeconds:0,pageViews:0} };
-  let activeSeconds = 0, pageViews = 0;
+  let activeSeconds = 0, pageViews = 0, appSessions = 0;
+  const appReaders = new Set();
   sessions.forEach(item => {
     const data = item.data || {}, userId = item.userId || item.id || 'unknown';
+    // v120: the installed app opens https://www.wajd.blog/?utm_source=app (manifest start_url).
+    if (String(data.campaignSource || '').toLowerCase() === 'app') { appSessions += 1; appReaders.add(userId); }
     // v118: session metadata is historical telemetry, not proof of Google auth.
     // A reader is registered only while a confirmed Google profile exists.
     const readerType = wajdAdminIsRegisteredUserId(userId) ? 'registered' : 'anonymous';
@@ -515,7 +518,7 @@ function wajdAdminBehaviorData() {
   });
   const sortCounts = map => Array.from(map.entries()).map(item => ({ key:item[0], count:item[1] })).sort((a,b) => b.count - a.count || a.key.localeCompare(b.key));
   return {
-    sessions, visitors:visitors.size, activeSeconds, pageViews, returners, daily, engagement, cohorts, rangeDays, cutoff,
+    sessions, visitors:visitors.size, appSessions, appReaders:appReaders.size, activeSeconds, pageViews, returners, daily, engagement, cohorts, rangeDays, cutoff,
     anonymousVisitors:visitorRows.filter(item => item.readerType !== 'registered').length,
     registeredVisitors:visitorRows.filter(item => item.readerType === 'registered').length,
     sources:sortCounts(sources), devices:sortCounts(devices), browsers:sortCounts(browsers), systems:sortCounts(systems), campaigns:sortCounts(campaigns),
@@ -553,6 +556,7 @@ function wajdAdminAudienceBehaviorHtml() {
   const sourcesPanel = '<section class="wajd-admin-panel"><div class="wajd-admin-panel-head"><h3>من أين يصل الزوار؟</h3><span class="wajd-admin-note">مصدر بداية الجلسة</span></div>' + wajdAdminBehaviorBarsHtml(data.sources,sessionCount,value => value === 'direct' ? 'مباشر أو دون إحالة' : wajdAdminAudienceSource(value)) + '</section>';
   const audiencePanel = '<section class="wajd-admin-panel"><div class="wajd-admin-panel-head"><h3>تركيبة الجمهور والأجهزة</h3><span class="wajd-admin-note">زوار فريدون ثم جلسات</span></div><div class="wajd-behavior-pairs"><div class="wajd-behavior-pair"><strong>' + wajdSavedArabicNumber.format(data.anonymousVisitors) + '</strong><span>زائر مجهول · ' + wajdSavedArabicNumber.format(Math.round(data.anonymousVisitors / data.visitors * 100)) + '٪</span></div><div class="wajd-behavior-pair"><strong>' + wajdSavedArabicNumber.format(data.registeredVisitors) + '</strong><span>حساب Google · ' + wajdSavedArabicNumber.format(Math.round(data.registeredVisitors / data.visitors * 100)) + '٪</span></div></div>' + wajdAdminBehaviorBarsHtml(data.devices,sessionCount,wajdAdminAudienceDevice) + '</section>';
   const browsersPanel = '<section class="wajd-admin-panel"><div class="wajd-admin-panel-head"><h3>المتصفحات والأنظمة</h3><span class="wajd-admin-note">أبعاد تقنية غير شخصية</span></div>' + wajdAdminBehaviorBarsHtml(data.browsers,sessionCount,wajdAdminAudienceBrowser) + wajdAdminBehaviorBarsHtml(data.systems,sessionCount,wajdAdminAudienceOs) + '</section>';
+  const appPanel = '<section class="wajd-admin-panel"><div class="wajd-admin-panel-head"><h3>تطبيق وَجْد على الهاتف</h3><span class="wajd-admin-note">من فتحوا المدونة من أيقونة التطبيق خلال الفترة</span></div><div class="wajd-behavior-bars"><div class="wajd-admin-rank"><span class="wajd-admin-rank-index">١</span><span>قرّاء استخدموا التطبيق</span><strong>' + wajdSavedArabicNumber.format(data.appReaders || 0) + '</strong></div><div class="wajd-admin-rank"><span class="wajd-admin-rank-index">٢</span><span>جلسات بدأت من التطبيق</span><strong>' + wajdSavedArabicNumber.format(data.appSessions || 0) + '</strong></div></div><p class="wajd-admin-note">يُحسب القارئ عند فتحه التطبيق، لا عند تثبيته فقط؛ من ثبّته ولم يفتحه لا يظهر هنا.</p></section>';
   const campaignsPanel = '<section class="wajd-admin-panel wajd-behavior-wide"><div class="wajd-admin-panel-head"><h3>الحملات</h3><span class="wajd-admin-note">UTM source / medium / campaign</span></div>' + (data.campaigns.length?wajdAdminBehaviorBarsHtml(data.campaigns,sessionCount,value=>value):'<div class="wajd-behavior-empty">لا توجد زيارات معلّمة بحملة في هذه الفترة</div>') + '</section>';
   const engagementRows = [{key:'قصيرة · أقل من ٣٠ ثانية وصفحة واحدة',count:data.engagement.quick},{key:'متوسطة · ما بين القصيرة والممتدة',count:data.engagement.steady},{key:'ممتدة · دقيقتان أو ٣ صفحات فأكثر',count:data.engagement.deep}];
   const engagementPanel = '<section class="wajd-admin-panel"><div class="wajd-admin-panel-head"><h3>نمط الجلسات</h3><span class="wajd-admin-note">تصنيف وصفي للمدة والتصفح</span></div>' + wajdAdminBehaviorBarsHtml(engagementRows,sessionCount,value => value) + '</section>';
@@ -563,7 +567,7 @@ function wajdAdminAudienceBehaviorHtml() {
   const comparisonPanel = '<section class="wajd-admin-panel"><div class="wajd-admin-panel-head"><h3>المجهولون والمسجلون</h3><span class="wajd-admin-note">المسجل = حساب Google مؤكد فقط</span></div><table class="wajd-behavior-compare"><thead><tr><th scope="col">الجمهور</th><th scope="col">الجلسات</th><th scope="col">متوسط الوقت</th><th scope="col">صفحات/جلسة</th></tr></thead><tbody>' + comparisonRows + '</tbody></table><p class="wajd-behavior-help">كل UID يُحسب هوية مستقلة؛ لا تُدمج الزيارات المجهولة مع حساب Google الذي قد يُسجَّل لاحقًا. تغيير المتصفح أو تسجيل الخروج قد ينشئ هوية مجهولة أخرى.</p></section>';
   const entries = data.entries.length ? data.entries.map((item,index) => '<div class="wajd-behavior-entry"><span>' + wajdSavedArabicNumber.format(index + 1) + '</span><a href="' + wajdAdminEscape(wajdAdminSafeUrl(item.url)) + '" target="_blank" rel="noopener noreferrer">' + wajdAdminEscape(item.title) + '</a><strong>' + wajdSavedArabicNumber.format(item.count) + '</strong></div>').join('') : '<div class="wajd-behavior-empty">لا توجد صفحات دخول مسجلة</div>';
   const entriesPanel = '<section class="wajd-admin-panel wajd-behavior-wide"><div class="wajd-admin-panel-head"><h3>أكثر صفحات الدخول</h3><span class="wajd-admin-note">الصفحة التي بدأت منها الجلسة</span></div><div class="wajd-behavior-entries">' + entries + '</div></section>';
-  return head + summaryHtml + note + '<div class="wajd-behavior-grid">' + dailyPanel + sourcesPanel + audiencePanel + browsersPanel + engagementPanel + comparisonPanel + campaignsPanel + entriesPanel + '</div>';
+  return head + summaryHtml + note + '<div class="wajd-behavior-grid">' + dailyPanel + sourcesPanel + audiencePanel + browsersPanel + engagementPanel + comparisonPanel + appPanel + campaignsPanel + entriesPanel + '</div>';
 }
 
 /* WAJD v100 JOURNEY ADMIN: lazy, dated and explicitly paginated; no writes. */
