@@ -1,5 +1,27 @@
 /* WAJD v114: record a tiny local page-entry envelope before quota-aware analytics starts.
    It is acknowledged by the detailed journey write, or recovered on the next visit. */
+/* Blogger writes Arabic marks (shadda, ؟, ،) inside JSON-LD as HTML entities such as &#1617;, which
+   are not decoded inside <script>. Rewrite the structured data with the real characters and trimmed
+   names so Google (which renders the page) reads the right text. */
+(function wajdFixStructuredData() {
+  const decode = value => String(value)
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    .trim();
+  const walk = node => {
+    if (typeof node === 'string') return decode(node);
+    if (Array.isArray(node)) return node.map(walk);
+    if (node && typeof node === 'object') { Object.keys(node).forEach(key => { node[key] = walk(node[key]); }); }
+    return node;
+  };
+  document.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
+    const text = script.textContent || '';
+    if (!/&(#\d+|#x[0-9a-f]+|quot|amp|lt|gt|#39|apos);|"\s/i.test(text)) return;
+    try { const fixed = JSON.stringify(walk(JSON.parse(text))); if (fixed !== text) script.textContent = fixed; } catch (error) {}
+  });
+})();
+
 const WAJD_EARLY_ENTRY_QUEUE_KEY = 'wajd-early-entry-queue-v106';
 const WAJD_EARLY_ENTRY_MAX_AGE = 30 * 86400000;
 
