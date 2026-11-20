@@ -1418,7 +1418,11 @@ function wajdAudiencePageUrl() {
 }
 
 function wajdAudiencePageTitle() {
-  const heading = document.querySelector('.entry-title.topic-title,.entry-title,.post-title');
+  // Only a single article/answer page may take its title from the page heading; on the home page and
+  // lists the first .entry-title is just the newest post, which made home visits look like that post.
+  const single = Boolean(wajdArticlePanel) || document.body.classList.contains('post') || document.body.classList.contains('wajd-qa-page');
+  if (!single && /^\/?$/.test(window.location.pathname) && !/reading-path=/.test(window.location.search)) return 'الصفحة الرئيسية';
+  const heading = single ? document.querySelector('.entry-title.topic-title,.entry-title,.post-title') : null;
   const value = wajdArticlePanel && wajdArticlePanel.dataset.postTitle || heading && heading.textContent || document.title || 'صفحة من وَجْد';
   return String(value).replace(/\s*[|–—-]\s*وَ?جْد\s*$/u, '').trim().slice(0, 250) || 'صفحة من وَجْد';
 }
