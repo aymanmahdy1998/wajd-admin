@@ -1,0 +1,18 @@
+{
+  "id": "https://www.wajd.blog/",
+  "name": "وَجْد | أيمن المهدي",
+  "short_name": "وَجْد",
+  "description": "الوَجْد هو الهم الناقع — كتابات أيمن المهدي",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "https://www.wajd.blog/?utm_source=app",
+  "scope": "https://www.wajd.blog/",
+  "display": "standalone",
+  "background_color": "#f7f3ec",
+  "theme_color": "#955340",
+  "icons": [
+    { "src": "https://aymanmahdy1998.github.io/wajd-admin/icons/wajd-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "https://aymanmahdy1998.github.io/wajd-admin/icons/wajd-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "https://aymanmahdy1998.github.io/wajd-admin/icons/wajd-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
