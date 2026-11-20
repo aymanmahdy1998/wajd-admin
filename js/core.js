@@ -262,6 +262,13 @@ const WAJD_AUDIENCE_IDLE_TIMEOUT = 60 * 1000;
 const WAJD_AUDIENCE_INITIAL_FLUSH_DELAY = 5 * 60 * 1000;
 const WAJD_AUDIENCE_FLUSH_INTERVAL = 10 * 60 * 1000;
 const WAJD_AUDIENCE_TICK_INTERVAL = 5000;
+// v119: reading an article without touching the page for a while is normal, so
+// while the article text is on screen the reader stays "active" for 3 minutes.
+const WAJD_AUDIENCE_READING_IDLE_TIMEOUT = 3 * 60 * 1000;
+// v119: visits are saved every minute when something changed (not every 10),
+// because the save on leaving the page often never reaches Firestore.
+const WAJD_JOURNEY_SAVE_INTERVAL = 60 * 1000;
+const WAJD_COMPLETED_ARTICLES_PREFIX = 'wajd-completed-articles-v119:';
 const WAJD_NOTIFICATIONS_REFRESH_INTERVAL = 2 * 60 * 1000;
 let wajdAudienceTracker = null;
 let wajdAudienceStartPromise = null;
@@ -1431,14 +1438,38 @@ function wajdAudienceProgress() {
   return Math.max(0, Math.min(1, Math.round(((window.scrollY - start) / Math.max(1, end - start)) * 1000) / 1000));
 }
 
+function wajdAudienceIdleLimit() {
+  return document.body.classList.contains('post') && wajdJourneyArticleVisible() ? WAJD_AUDIENCE_READING_IDLE_TIMEOUT : WAJD_AUDIENCE_IDLE_TIMEOUT;
+}
+
+// v119: articles this browser finished (any reader, signed in or not). Google
+// readers also keep their cloud history; this makes anonymous completion count.
+function wajdLocalCompletedRead(uid) {
+  if (!uid) return [];
+  try {
+    const list = JSON.parse(localStorage.getItem(WAJD_COMPLETED_ARTICLES_PREFIX + uid) || '[]');
+    return Array.isArray(list) ? list.filter(item => typeof item === 'string' && item).slice(-500) : [];
+  } catch (error) { return []; }
+}
+
+function wajdLocalCompletedAdd(uid, articleId) {
+  if (!uid || !articleId) return;
+  const list = wajdLocalCompletedRead(uid);
+  if (list.includes(articleId)) return;
+  list.push(articleId);
+  try { localStorage.setItem(WAJD_COMPLETED_ARTICLES_PREFIX + uid, JSON.stringify(list.slice(-500))); } catch (error) {}
+}
+
 function wajdAudienceReaderState() {
   let data = null;
   try { data = window.wajdGetReaderJourneyData ? window.wajdGetReaderJourneyData() : null; } catch (error) {}
   const history = data && Array.isArray(data.history) ? data.history : [];
   const current = wajdCurrentPostId ? history.find(item => String(item.id) === String(wajdCurrentPostId)) : null;
+  const uid = wajdAudienceTracker && wajdAudienceTracker.user ? wajdAudienceTracker.user.uid : (wajdSavedUser && wajdSavedUser.uid || '');
+  const local = wajdLocalCompletedRead(uid);
   return {
-    completedArticles:history.filter(item => item.details && item.details.completed === true).length,
-    lastCompleted:Boolean(current && current.details && current.details.completed === true),
+    completedArticles:Math.max(history.filter(item => item.details && item.details.completed === true).length, local.length),
+    lastCompleted:Boolean(current && current.details && current.details.completed === true) || Boolean(wajdCurrentPostId && local.includes(String(wajdCurrentPostId))),
     lastProgress:current && current.details ? Math.max(0, Math.min(1, Number(current.details.progress) || 0)) : wajdAudienceProgress()
   };
 }
@@ -1720,9 +1751,9 @@ async function wajdAudienceFlush(force) {
   tracker.flushAgain = false;
   tracker.flushPromise = (async () => {
     const metadata = wajdAudienceMetadata();
-    metadata.completedArticles = tracker.completedArticles;
+    metadata.completedArticles = Math.max(tracker.completedArticles, metadata.completedArticles);
     metadata.lastProgress = Math.max(metadata.lastProgress, tracker.lastProgress || 0);
-    metadata.lastCompleted = tracker.lastCompleted;
+    metadata.lastCompleted = tracker.lastCompleted || metadata.lastCompleted;
     const visitorPatch = {
       readerType:tracker.readerType,
       lastSeenAt:serverTimestamp(),
@@ -1803,7 +1834,7 @@ async function wajdAudienceRestartSession(tracker) {
     tracker.session = { key:WAJD_AUDIENCE_SESSION_PREFIX + tracker.user.uid, id:wajdAudienceRandomId(), startedAt:now, lastActivityAt:now, isNew:true };
     tracker.sessionRef = doc(wajdSavedDb, 'audienceVisitors', tracker.user.uid, 'audienceSessions', tracker.session.id);
     const metadata = wajdAudienceMetadata();
-    metadata.completedArticles = tracker.completedArticles;
+    metadata.completedArticles = Math.max(tracker.completedArticles, metadata.completedArticles);
     const batch = writeBatch(wajdSavedDb);
     batch.set(tracker.visitorRef, {
       readerType:tracker.readerType,
@@ -1867,8 +1898,9 @@ function wajdAudienceApplyReaderData(event) {
   if (!tracker || tracker.stopped || !data || data.uid !== tracker.user.uid) return;
   const history = Array.isArray(data.history) ? data.history : [];
   const current = wajdCurrentPostId ? history.find(item => String(item.id) === String(wajdCurrentPostId)) : null;
-  const completedArticles = history.filter(item => item.details && item.details.completed === true).length;
-  const lastCompleted = Boolean(current && current.details && current.details.completed === true);
+  const local = wajdLocalCompletedRead(tracker.user.uid);
+  const completedArticles = Math.max(history.filter(item => item.details && item.details.completed === true).length, local.length);
+  const lastCompleted = Boolean(current && current.details && current.details.completed === true) || Boolean(wajdCurrentPostId && local.includes(String(wajdCurrentPostId)));
   const lastProgress = current && current.details ? Math.max(0, Math.min(1, Number(current.details.progress) || 0)) : tracker.lastProgress;
   const changed = completedArticles !== tracker.completedArticles || lastCompleted !== tracker.lastCompleted || Math.abs(lastProgress - tracker.lastProgress) >= .01;
   tracker.completedArticles = completedArticles;
@@ -1886,9 +1918,10 @@ function wajdAudienceTick() {
   const now = Date.now();
   const elapsed = Math.min(10, Math.max(0, Math.round((now - tracker.lastTickAt) / 1000)));
   tracker.lastTickAt = now;
-  const active = document.visibilityState !== 'hidden' && now - tracker.lastInteractionAt <= WAJD_AUDIENCE_IDLE_TIMEOUT && wajdAudienceOwnsActiveTab(tracker);
+  const active = document.visibilityState !== 'hidden' && now - tracker.lastInteractionAt <= wajdAudienceIdleLimit() && wajdAudienceOwnsActiveTab(tracker);
   wajdJourneySample(tracker, active);
-  if (tracker.journey && now - tracker.journey.lastFlushAt >= WAJD_AUDIENCE_FLUSH_INTERVAL) wajdJourneyQueue(tracker.journey);
+  const visit = tracker.journey;
+  if (visit && (!visit.created || visit.sentRevision !== visit.revision) && now - visit.lastFlushAt >= WAJD_JOURNEY_SAVE_INTERVAL) wajdJourneyQueue(visit);
   if (active && elapsed > 0) {
     tracker.pendingActiveSeconds += elapsed;
     tracker.session.lastActivityAt = now;
@@ -1905,6 +1938,14 @@ function wajdAudienceBindLifecycle() {
   if (wajdAudienceLifecycleBound) return;
   wajdAudienceLifecycleBound = true;
   ['pointerdown','keydown','touchstart','scroll'].forEach(type => window.addEventListener(type, wajdAudienceMarkActivity, { passive:true }));
+  // v119: moving the mouse over the text is reading activity too (throttled).
+  let lastMouseActivity = 0;
+  window.addEventListener('mousemove', () => {
+    const now = Date.now();
+    if (now - lastMouseActivity < 5000) return;
+    lastMouseActivity = now;
+    wajdAudienceMarkActivity();
+  }, { passive:true });
   window.addEventListener('focus', wajdAudienceMarkActivity);
   window.addEventListener('wajd-reader-data-updated', wajdAudienceApplyReaderData);
   document.addEventListener('visibilitychange', () => {
@@ -1913,6 +1954,9 @@ function wajdAudienceBindLifecycle() {
     if (document.visibilityState === 'hidden') {
       wajdAudiencePersistPending(tracker);
       wajdAudiencePersistSession(tracker, true);
+      // v119: on phones, switching apps or closing the tab often never fires
+      // pagehide, so this is the last reliable moment to save the session.
+      if (wajdAnalyticsCanWrite()) wajdAudienceFlush(true).catch(() => {});
     } else wajdAudienceMarkActivity();
   });
   window.addEventListener('pagehide', () => {
@@ -2120,8 +2164,9 @@ function wajdJourneyArticleVisible() {
 }
 
 function wajdJourneyDepth() {
+  // v119: no document.hasFocus() check. A visible page that is not focused
+  // (side-by-side windows, in-app browsers) was measured as zero depth.
   if (document.visibilityState === 'hidden' || document.body.classList.contains('wajd-modal-open')) return 0;
-  if (typeof document.hasFocus === 'function' && !document.hasFocus()) return 0;
   const body = document.querySelector('.post-body,.amp-contnt');
   if (!body) return 0;
   const rect = body.getBoundingClientRect();
@@ -2129,11 +2174,26 @@ function wajdJourneyDepth() {
   if (!(height > 0) || rect.top >= window.innerHeight) return 0;
   // This is visible depth in THIS visit, not the reader's restored history value.
   if (rect.bottom <= window.innerHeight + 1) {
-    const unresolved = body.querySelectorAll && Array.from(body.querySelectorAll('img')).some(img => !img.complete && img.getBoundingClientRect().height < 2);
-    if (!unresolved) return 1;
-    return 0;
+    // Hidden images (offsetParent null) never load and must not block the end.
+    const unresolved = body.querySelectorAll && Array.from(body.querySelectorAll('img')).some(img => !img.complete && img.offsetParent !== null && img.getBoundingClientRect().height < 2);
+    return unresolved ? .999 : 1;
   }
   return Math.max(0, Math.min(.999, Math.round((window.innerHeight - rect.top) / height * 1000) / 1000));
+}
+
+function wajdJourneyMilestone(progress) {
+  return progress >= 1 ? 4 : progress >= .75 ? 3 : progress >= .5 ? 2 : progress >= .25 ? 1 : 0;
+}
+
+// Minimum seconds with the text on screen before reaching the end counts as
+// "completed": about a third of the estimated reading time, 15s to 2 min.
+function wajdJourneyCompletionSeconds() {
+  if (wajdJourneyCompletionSeconds.value !== undefined) return wajdJourneyCompletionSeconds.value;
+  const body = document.querySelector('.post-body,.amp-contnt');
+  const text = body ? String(body.innerText || body.textContent || '').trim() : '';
+  const words = text ? text.split(/\s+/).length : 0;
+  wajdJourneyCompletionSeconds.value = Math.max(15, Math.min(120, Math.round(words / 200 * 60 * .33)));
+  return wajdJourneyCompletionSeconds.value;
 }
 
 function wajdJourneyBegin(tracker) {
@@ -2184,21 +2244,34 @@ function wajdJourneySample(tracker, activeOverride) {
   try {
   const now = Date.now(), previous = visit.lastSampleAt;
   visit.lastSampleAt = now;
-  const visible = document.visibilityState !== 'hidden' && (typeof document.hasFocus !== 'function' || document.hasFocus());
+  const visible = document.visibilityState !== 'hidden';
   const active = activeOverride === undefined ? visible && wajdAudienceOwnsActiveTab(tracker) : activeOverride;
-  const seconds = active && visible ? Math.max(0, Math.min(10, (Math.min(now, tracker.lastInteractionAt + WAJD_AUDIENCE_IDLE_TIMEOUT) - previous) / 1000)) : 0;
+  const seconds = active && visible ? Math.max(0, Math.min(10, (Math.min(now, tracker.lastInteractionAt + wajdAudienceIdleLimit()) - previous) / 1000)) : 0;
   const isArticle = visit.base.pageType === 'article' || visit.base.pageType === 'answer';
   if (seconds > 0) {
     visit.active = Math.min(86400, visit.active + seconds);
     if (isArticle && wajdJourneyArticleVisible()) visit.reading = Math.min(visit.active, visit.reading + seconds);
     visit.revision++;
   }
+  let saveNow = false;
   if (isArticle && visible) {
     const depth = wajdJourneyDepth();
     if (depth > visit.maxProgress) {
+      // v119: save right away when the reader passes 25/50/75/100%.
+      if (wajdJourneyMilestone(depth) > wajdJourneyMilestone(visit.maxProgress)) saveNow = true;
       visit.maxProgress = depth; visit.revision++;
     }
   }
+  // v119: any reader (signed in or not) who reaches the end and spent a
+  // reasonable time with the text on screen has completed the article.
+  if (isArticle && !visit.completed && visit.maxProgress === 1 && visit.reading >= wajdJourneyCompletionSeconds()) {
+    visit.completed = true; visit.revision++; saveNow = true;
+    wajdLocalCompletedAdd(tracker.user.uid, visit.base.articleId);
+    tracker.completedArticles = Math.max(tracker.completedArticles, wajdLocalCompletedRead(tracker.user.uid).length);
+    tracker.lastCompleted = true; tracker.dirtyRevision++;
+    window.setTimeout(() => wajdAudienceFlush(false).catch(error => console.warn('Wajd audience completion:', error)), 0);
+  }
+  if (saveNow) window.setTimeout(() => wajdJourneyQueue(visit), 0);
   } catch (error) {
     visit.disabled = true;
     console.warn('Wajd journey measurement unavailable');
@@ -2221,19 +2294,20 @@ async function wajdJourneyFlush(visit) {
   if (visit.promise) { visit.again = true; return visit.promise; }
   visit.promise = (async () => {
     if (!visit.created) {
-      const revision = visit.revision;
-      const activeSeconds = Math.min(Math.floor(visit.active), 300);
-      const readingSeconds = Math.min(Math.floor(visit.reading), activeSeconds);
+      // v119: the rules only accept a pristine zero-state create. If the first
+      // attempt failed and is retried after time passed, write zeros anyway and
+      // send the measured values in the follow-up update.
       const batch = writeBatch(wajdSavedDb);
-      batch.set(visit.ref, { ...visit.base, updatedAt:serverTimestamp(), activeSeconds, readingSeconds,
-        maxProgress:visit.maxProgress, reachedEnd:visit.maxProgress === 1, completed:visit.completed,
-        saved:visit.saved, liked:visit.liked, commented:visit.commented, endReason:visit.endReason }, { merge:true });
+      batch.set(visit.ref, { ...visit.base, updatedAt:serverTimestamp(), activeSeconds:0, readingSeconds:0,
+        maxProgress:0, reachedEnd:false, completed:false,
+        saved:false, liked:false, commented:false, endReason:'' }, { merge:true });
       await batch.commit();
       visit.created = true;
-      visit.savedActive = activeSeconds;
-      visit.savedReading = readingSeconds;
-      visit.sentRevision = revision;
+      visit.savedActive = 0;
+      visit.savedReading = 0;
+      visit.sentRevision = 0;
       visit.lastFlushAt = Date.now();
+      if (visit.revision > 0) visit.again = true;
       wajdEarlyAcknowledge(visit.base.earlyEntryKey);
       return;
     }
@@ -2305,6 +2379,9 @@ function wajdJourneyBindLifecycle() {
   document.addEventListener('visibilitychange', () => {
     const tracker = wajdAudienceTracker;
     wajdJourneySample(tracker);
+    // v119: save the visit when the page is hidden (app switch, tab close on
+    // phones). The visit stays open, so returning keeps adding to it.
+    if (document.visibilityState === 'hidden' && tracker && tracker.journey && !tracker.stopped) wajdJourneyQueue(tracker.journey);
   });
   window.addEventListener('pagehide', () => wajdJourneyEnd(wajdAudienceTracker, 'pagehide'));
   window.addEventListener('pageshow', event => {
