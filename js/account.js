@@ -446,6 +446,18 @@ function wajdReadingSetup(){
   }));
   document.addEventListener('click',event=>{const toolbar=document.getElementById('wajd-reading-toolbar');if(fontPicker&&fontPicker.classList.contains('is-open')&&toolbar&&!toolbar.contains(event.target))setFontPickerOpen(false);});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&fontPicker&&fontPicker.classList.contains('is-open')){setFontPickerOpen(false);fontTrigger&&fontTrigger.focus();}});
+  // On phones the toolbar sits over the last lines: tuck it away while the reader scrolls down,
+  // bring it back on any scroll up or once the article text has ended.
+  const readingToolbar=document.getElementById('wajd-reading-toolbar');
+  if(readingToolbar){
+    const narrow=window.matchMedia('(max-width:720px)');let toolbarLastY=window.scrollY;
+    window.addEventListener('scroll',()=>{
+      const y=window.scrollY,dy=y-toolbarLastY;if(Math.abs(dy)<6)return;toolbarLastY=y;
+      const textEnded=body.getBoundingClientRect().bottom<window.innerHeight;
+      const pickerOpen=fontPicker&&fontPicker.classList.contains('is-open');
+      readingToolbar.classList.toggle('is-tucked',narrow.matches&&dy>0&&y>240&&!textEnded&&!pickerOpen);
+    },{passive:true});
+  }
   const text=(body.innerText||body.textContent||'').trim();
   const words=text?text.split(/\s+/).filter(Boolean).length:0;
   const codeWords=Array.from(body.querySelectorAll('pre,code')).reduce((sum,node)=>sum+(node.textContent||'').trim().split(/\s+/).filter(Boolean).length,0);
@@ -514,8 +526,46 @@ function wajdReadingSetup(){
     }).catch(error=>{completed=false;renderComplete();console.warn('Wajd automatic reading completion:',error);});
     return true;
   };
+  // Reading position kept on this device for every reader (signed-in readers also have it in Firestore).
+  const localPosKey='wajd-reading-pos-v1';
+  const readLocalPos=()=>{try{const all=JSON.parse(localStorage.getItem(localPosKey)||'{}');return all&&typeof all==='object'?all:{};}catch(error){return{};}};
+  let localPosTimer=0;
+  const rememberLocalPos=progress=>{
+    if(progress<.04&&!completed)return;
+    window.clearTimeout(localPosTimer);
+    localPosTimer=window.setTimeout(()=>{try{
+      const all=readLocalPos();
+      if(completed||progress>=.97)delete all[postId];else all[postId]={p:Math.round(progress*1000)/1000,t:Date.now()};
+      Object.keys(all).sort((a,b)=>(all[b].t||0)-(all[a].t||0)).slice(60).forEach(key=>delete all[key]);
+      localStorage.setItem(localPosKey,JSON.stringify(all));
+    }catch(error){}},1500);
+  };
+  const scrollToProgress=progress=>{
+    const rect=body.getBoundingClientRect();
+    const start=window.scrollY+rect.top;
+    const end=start+body.offsetHeight-window.innerHeight;
+    window.scrollTo({top:Math.max(0,start+progress*Math.max(1,end-start)),behavior:'smooth'});
+  };
+  const offerLocalResume=()=>{
+    if(window.location.hash||window.scrollY>=80)return;
+    const saved=readLocalPos()[postId];const progress=saved&&Number(saved.p);
+    if(!(progress>.04&&progress<.97))return;
+    const chip=document.createElement('button');
+    chip.type='button';chip.className='wajd-resume-chip';
+    chip.textContent='أكمل من حيث توقفت · '+wajdReaderNumber.format(Math.round(progress*100))+'٪';
+    let removed=false;
+    const remove=()=>{if(removed)return;removed=true;window.removeEventListener('scroll',onScroll);chip.classList.remove('is-visible');window.setTimeout(()=>chip.remove(),300);};
+    const onScroll=()=>{if(window.scrollY>400)remove();};
+    chip.addEventListener('click',()=>{scrollToProgress(progress);remove();});
+    document.body.appendChild(chip);
+    if(window.getComputedStyle(chip).position!=='fixed'){chip.remove();return;}
+    window.requestAnimationFrame(()=>chip.classList.add('is-visible'));
+    window.addEventListener('scroll',onScroll,{passive:true});
+    window.setTimeout(remove,15000);
+  };
   const updateProgress=()=>{
     const current=metrics();if(progressBar)progressBar.style.width=(current.progress*100).toFixed(1)+'%';
+    rememberLocalPos(current.progress);
     if(completeAtArticleEnd(current)){window.clearTimeout(updateProgress.timer);return;}
     window.clearTimeout(updateProgress.timer);updateProgress.timer=window.setTimeout(()=>saveProgress(false).catch(error=>console.warn('Wajd reading progress:',error)),5000);
   };
@@ -537,6 +587,7 @@ function wajdReadingSetup(){
         completeTitle.textContent='احفظ تقدّمك';
         completeHint.textContent='سجّل الدخول بحساب Google لحفظ التقدّم وسجل القراءة.';
         completeButton.textContent='تسجيل الدخول لحفظ التقدّم';
+        offerLocalResume();
         updateProgress();
         return;
       }
