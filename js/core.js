@@ -2577,7 +2577,8 @@ function wajdAdminEnsureModule() {
   return wajdAdminModulePromise;
 }
 
-async function wajdAdminLoad() {
+// force=true only from the «تحديث» button: the admin module may otherwise serve its saved copy.
+async function wajdAdminLoad(force) {
   if (!wajdAdminContent || !wajdIsAdmin(wajdSavedUser)) return;
   let api;
   try {
@@ -2595,7 +2596,7 @@ async function wajdAdminLoad() {
       : 'تعذّر تحميل ملف لوحة الإدارة. تحقّق من الرابط واتصال الإنترنت، ثم اضغط «تحديث».') + '</div>';
     return;
   }
-  return api.load();
+  return api.load({ force: force === true });
 }
 
 function wajdAdminOpenModal() {
@@ -2622,7 +2623,7 @@ function wajdAdminBindInterface() {
   if (!wajdAdminOpen || !wajdAdminOverlay) return;
   wajdAdminOpen.addEventListener('click', wajdAdminOpenModal);
   wajdAdminClose.addEventListener('click', wajdAdminCloseModal);
-  wajdAdminRefresh.addEventListener('click', wajdAdminLoad);
+  wajdAdminRefresh.addEventListener('click', () => wajdAdminLoad(true));
   wajdAdminOverlay.addEventListener('click', event => { if (event.target === wajdAdminOverlay) wajdAdminCloseModal(); });
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && wajdAdminOverlay.classList.contains('is-open')) wajdAdminCloseModal(); });
 }

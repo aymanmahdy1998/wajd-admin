@@ -332,7 +332,7 @@ async function wajdAdminLoadReaderVisits(userId) {
   wajdAdminReaderVisits.set(userId,{loading:true,rows:[]});
   try {
     const snapshot = await getDocs(query(collection(wajdSavedDb,WAJD_JOURNEY_COLLECTION),where('userId','==',userId),limit(1000)));
-    wajdAdminReaderVisits.set(userId,{loading:false,rows:snapshot.docs.map(item => item.data()),capped:snapshot.size >= 1000});
+    wajdAdminReaderVisits.set(userId,{loading:false,at:Date.now(),rows:snapshot.docs.map(item => item.data()),capped:snapshot.size >= 1000});
   } catch (error) {
     console.warn('Wajd reader visits:',error);
     wajdAdminReaderVisits.set(userId,{loading:false,rows:[],error:true});
@@ -584,7 +584,7 @@ function wajdAdminJourneyRepaint() {
   if (root) root.innerHTML = wajdAdminJourneyHtml();
 }
 
-async function wajdAdminJourneyLoad(reset) {
+async function wajdAdminJourneyLoad(reset, force) {
   if (!wajdIsAdmin(wajdAdminCurrentUser())) return;
   const state = wajdJourneyAdmin;
   if (state.loading && !reset) return;
@@ -594,6 +594,20 @@ async function wajdAdminJourneyLoad(reset) {
     state.loaded = false; state.cached = false; state.sessionLimit = 12;
   }
   const generation = state.generation;
+  state.fromCache = false;
+  if (reset && !force) {
+    // v120: reuse this device's copy of the first page for this period (no Firestore reads).
+    const saved = await wajdAdminCacheIo('readonly', wajdAdminCacheKey('journey'));
+    const entry = saved && saved.version === WAJD_ADMIN_CACHE_VERSION && saved.ranges && saved.ranges[state.range];
+    if (generation !== state.generation) return;
+    if (entry && Date.now() - entry.at < WAJD_ADMIN_CACHE_TTL) {
+      state.rows = entry.rows.map(row => ({ id:row.id, data:wajdAdminCacheDecodeValue(row.d) }));
+      state.now = entry.now; state.cutoff = wajdAdminJourneyWindow(state.range, entry.now);
+      state.hasMore = entry.hasMore; state.loaded = true; state.loadedAt = entry.at; state.fromCache = true;
+      state.loading = false; state.error = ''; wajdAdminJourneyRepaint();
+      return;
+    }
+  }
   state.loading = true; state.error = ''; wajdAdminJourneyRepaint();
   try {
     const constraints = [where('startedAt','>=',new Date(state.cutoff)),where('startedAt','<=',new Date(state.now)),orderBy('startedAt','desc')];
@@ -615,6 +629,14 @@ async function wajdAdminJourneyLoad(reset) {
     state.hasMore = snapshot.size > 500;
     state.cached = state.cached || Boolean(snapshot.metadata && snapshot.metadata.fromCache);
     state.loaded = true; state.loadedAt = Date.now();
+    if (reset) {
+      const saved = (await wajdAdminCacheIo('readonly', wajdAdminCacheKey('journey'))) || {};
+      const ranges = saved.version === WAJD_ADMIN_CACHE_VERSION && saved.ranges ? saved.ranges : {};
+      try {
+        ranges[state.range] = { at:state.loadedAt, now:state.now, hasMore:state.hasMore, rows:state.rows.map(row => ({ id:row.id, d:wajdAdminCacheEncodeValue(row.data) })) };
+        wajdAdminCacheIo('readwrite', wajdAdminCacheKey('journey'), { version:WAJD_ADMIN_CACHE_VERSION, ranges });
+      } catch (error) {}
+    }
   } catch (error) {
     if (generation !== state.generation) return;
     const code = String(error && error.code || '');
@@ -794,8 +816,8 @@ function wajdAdminJourneyHandleClick(button) {
   const state=wajdJourneyAdmin,command=button.dataset.journeyCommand,user=button.dataset.journeyUser;
   if(!command&&!user)return false;
   if(user){state.user=user;state.sessionLimit=12;wajdAdminJourneyRepaint();return true;}
-  if(command==='refresh')wajdAdminJourneyLoad(true);
-  else if(command==='more')wajdAdminJourneyLoad(false);
+  if(command==='refresh')wajdAdminJourneyLoad(true,true);
+  else if(command==='more')wajdAdminJourneyLoad(state.fromCache,state.fromCache);
   else if(command==='clear-user'){state.user='';wajdAdminJourneyRepaint();}
   else if(command==='sessions'){state.sessionLimit+=12;wajdAdminJourneyRepaint();}
   return true;
@@ -844,7 +866,7 @@ function wajdAdminRenderView() {
   const warning = wajdAdminData.loadWarnings && wajdAdminData.loadWarnings.length
     ? '<div class="wajd-admin-state">تم تحميل اللوحة، مع تعذّر قراءة ' + wajdSavedArabicNumber.format(wajdAdminData.loadWarnings.length) + ' مصدر فرعي. اضغط «تحديث» للمحاولة مجددًا.</div>'
     : '';
-  wajdAdminContent.innerHTML = wajdAdminNav() + warning + body;
+  wajdAdminContent.innerHTML = wajdAdminNav() + wajdAdminCacheAgeLabel() + warning + body;
   if (wajdAdminView === 'paths' && window.wajdReadingPathsAdminRender) window.wajdReadingPathsAdminRender();
   if (wajdAdminView === 'path-analytics' && window.wajdReadingPathsAnalyticsRender) window.wajdReadingPathsAnalyticsRender();
   if (wajdAdminView === 'audience-journey' && !wajdJourneyAdmin.loaded && !wajdJourneyAdmin.loading && !wajdJourneyAdmin.error) wajdAdminJourneyLoad(true);
@@ -898,22 +920,108 @@ function wajdAdminOptionalSnapshot(promise,label) {
   });
 }
 
-async function wajdAdminLoad() {
+/* v120 read budget: Firestore's free plan allows 50,000 reads a day and every full dashboard load reads
+   every like, view, save, history row, session and visitor. The raw documents are kept on this device
+   (IndexedDB) for WAJD_ADMIN_CACHE_TTL; opening the dashboard again inside that window costs no reads.
+   «تحديث» always reads fresh data, and any moderation action clears the copy. */
+const WAJD_ADMIN_CACHE_TTL = 30 * 60 * 1000;
+const WAJD_ADMIN_CACHE_DB = 'wajd-admin-cache', WAJD_ADMIN_CACHE_STORE = 'bundles', WAJD_ADMIN_CACHE_VERSION = 1;
+let wajdAdminCacheParts = null, wajdAdminCacheFresh = {}, wajdAdminCacheSavedAt = 0, wajdAdminCacheServed = false;
+
+function wajdAdminCacheOpen() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('no-indexeddb')); return; }
+    const request = indexedDB.open(WAJD_ADMIN_CACHE_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(WAJD_ADMIN_CACHE_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+async function wajdAdminCacheIo(mode, key, value) {
+  try {
+    const db = await wajdAdminCacheOpen();
+    return await new Promise((resolve, reject) => {
+      const store = db.transaction(WAJD_ADMIN_CACHE_STORE, mode).objectStore(WAJD_ADMIN_CACHE_STORE);
+      const request = mode === 'readonly' ? store.get(key) : (value === undefined ? store.delete(key) : store.put(value, key));
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) { console.warn('Wajd admin cache:', error && error.message || error); return null; }
+}
+function wajdAdminCacheKey(name) { const user = wajdAdminCurrentUser(); return (user && user.uid || 'admin') + ':' + name; }
+function wajdAdminCacheClear() { wajdAdminCacheParts = null; wajdAdminCacheIo('readwrite', wajdAdminCacheKey('main')); wajdAdminCacheIo('readwrite', wajdAdminCacheKey('journey')); }
+
+function wajdAdminCacheEncodeValue(value) {
+  if (value && typeof value === 'object') {
+    if (typeof value.toMillis === 'function') return { __wajdTs: value.toMillis() };
+    if (value instanceof Date) return { __wajdTs: value.getTime() };
+    if (Array.isArray(value)) return value.map(wajdAdminCacheEncodeValue);
+    if (value.constructor === Object) { const out = {}; Object.keys(value).forEach(key => { out[key] = wajdAdminCacheEncodeValue(value[key]); }); return out; }
+    return null; // references or other SDK objects are not needed by the dashboard
+  }
+  return value;
+}
+function wajdAdminCacheTimestamp(millis) {
+  const seconds = Math.floor(millis / 1000);
+  return { seconds, nanoseconds: (millis - seconds * 1000) * 1e6, toMillis: () => millis, toDate: () => new Date(millis), valueOf: () => millis };
+}
+function wajdAdminCacheDecodeValue(value) {
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value)) return value.map(wajdAdminCacheDecodeValue);
+    if (Object.keys(value).length === 1 && typeof value.__wajdTs === 'number') return wajdAdminCacheTimestamp(value.__wajdTs);
+    const out = {}; Object.keys(value).forEach(key => { out[key] = wajdAdminCacheDecodeValue(value[key]); }); return out;
+  }
+  return value;
+}
+function wajdAdminCacheEncodeSnapshot(snapshot) {
+  const docs = []; snapshot.forEach(item => docs.push({ p: item.ref.path, d: wajdAdminCacheEncodeValue(item.data()) }));
+  const flags = {}; ['indexFallback','indexUnavailable'].forEach(key => { if (snapshot[key] !== undefined) flags[key] = snapshot[key]; });
+  return { docs, flags };
+}
+function wajdAdminCacheDecodeSnapshot(part) {
+  const docs = part.docs.map(row => {
+    const ref = doc(wajdSavedDb, row.p), data = wajdAdminCacheDecodeValue(row.d);
+    return { id: ref.id, ref, data: () => data, exists: () => true };
+  });
+  return Object.assign(wajdAdminSnapshot(docs), part.flags || {});
+}
+// Returns a cached snapshot for this part when the dashboard is serving from the saved copy, otherwise
+// loads it from Firestore and remembers it for the next save.
+async function wajdAdminCached(name, loader) {
+  if (wajdAdminCacheParts && wajdAdminCacheParts[name]) return wajdAdminCacheDecodeSnapshot(wajdAdminCacheParts[name]);
+  const snapshot = await loader();
+  try { wajdAdminCacheFresh[name] = wajdAdminCacheEncodeSnapshot(snapshot); } catch (error) {}
+  return snapshot;
+}
+function wajdAdminCacheAgeLabel() {
+  if (!wajdAdminCacheServed || !wajdAdminCacheSavedAt) return '';
+  const minutes = Math.max(1, Math.round((Date.now() - wajdAdminCacheSavedAt) / 60000));
+  return '<div class="wajd-admin-state wajd-admin-cache-note">بيانات محفوظة على هذا الجهاز منذ ' + wajdSavedArabicNumber.format(minutes) + ' ' + (minutes === 1 ? 'دقيقة' : 'دقائق') + ' لتوفير حصة القراءة في Firebase. اضغط «تحديث» لجلب أحدث الأرقام.</div>';
+}
+
+async function wajdAdminLoad(options) {
   if (!wajdAdminContent || !wajdIsAdmin(wajdAdminCurrentUser())) return;
-  if (wajdAdminView === 'audience-journey' && wajdAdminData) return wajdAdminJourneyLoad(true);
+  if (wajdAdminView === 'audience-journey' && wajdAdminData) return wajdAdminJourneyLoad(true, Boolean(options && options.force));
   wajdJourneyAdmin.generation++; wajdJourneyAdmin.loaded=false; wajdJourneyAdmin.loading=false; wajdJourneyAdmin.error='';
   wajdAdminRefresh.disabled = true;
   wajdAdminContent.innerHTML = '<div class="wajd-admin-state">جارٍ جمع بيانات لوحة الإدارة…</div>';
   try {
+    const force = Boolean(options && options.force);
+    wajdAdminCacheFresh = {}; wajdAdminCacheParts = null; wajdAdminCacheServed = false;
+    if (force) wajdAdminCacheClear();
+    else {
+      const saved = await wajdAdminCacheIo('readonly', wajdAdminCacheKey('main'));
+      if (saved && saved.version === WAJD_ADMIN_CACHE_VERSION && Date.now() - saved.at < WAJD_ADMIN_CACHE_TTL && saved.parts) { wajdAdminCacheParts = saved.parts; wajdAdminCacheSavedAt = saved.at; wajdAdminCacheServed = true; }
+    }
     const [articles, profilesSnapshot, notifications, blocksSnapshot, anonymousVisitorsSnapshot, audienceVisitorsSnapshot, audienceSessionsSnapshot, audienceRecoverySnapshot] = await Promise.all([
-      getDocs(collection(wajdSavedDb,'articles')),
-      getDocs(collection(wajdSavedDb,'profiles')),
-      getDocs(collection(wajdSavedDb,'adminNotifications')),
-      getDocs(collection(wajdSavedDb,'moderationBlocks')),
-      getDocs(collection(wajdSavedDb,'anonymousVisitors')),
-      getDocs(collection(wajdSavedDb,'audienceVisitors')),
-      wajdAdminLoadAudienceSessions(),
-      wajdAdminOptionalSnapshot(wajdAdminLoadDatedCollection(collection(wajdSavedDb,'audienceRecoveryDeltas'),'recordedAt',90),'audience recovery')
+      wajdAdminCached('articles',() => getDocs(collection(wajdSavedDb,'articles'))),
+      wajdAdminCached('profiles',() => getDocs(collection(wajdSavedDb,'profiles'))),
+      wajdAdminCached('notifications',() => getDocs(collection(wajdSavedDb,'adminNotifications'))),
+      wajdAdminCached('blocks',() => getDocs(collection(wajdSavedDb,'moderationBlocks'))),
+      wajdAdminCached('anonymousVisitors',() => getDocs(collection(wajdSavedDb,'anonymousVisitors'))),
+      wajdAdminCached('audienceVisitors',() => getDocs(collection(wajdSavedDb,'audienceVisitors'))),
+      wajdAdminCached('sessions',() => wajdAdminLoadAudienceSessions()),
+      wajdAdminCached('recovery',() => wajdAdminOptionalSnapshot(wajdAdminLoadDatedCollection(collection(wajdSavedDb,'audienceRecoveryDeltas'),'recordedAt',90),'audience recovery'))
     ]);
     let posts=[];
     try{posts=await wajdSavedGetFeed();}
@@ -932,7 +1040,13 @@ async function wajdAdminLoad() {
       { label:'all-history', ref:collectionGroup(wajdSavedDb,'history') },
       { label:'all-owner-comments', ref:collectionGroup(wajdSavedDb,'comments') }
     ];
-    const interactionData = await wajdAdminCollect(interactionRequests);
+    let interactionData;
+    if (wajdAdminCacheParts && wajdAdminCacheParts.interactions) interactionData = { snapshot: wajdAdminCacheDecodeSnapshot(wajdAdminCacheParts.interactions), failures: [] };
+    else {
+      interactionData = await wajdAdminCollect(interactionRequests);
+      // A partial result is never saved, so a failed source is retried on the next open.
+      if (!interactionData.failures.length) { try { wajdAdminCacheFresh.interactions = wajdAdminCacheEncodeSnapshot(interactionData.snapshot); } catch (error) {} }
+    }
     const interactionDocs = interactionData.snapshot.docs;
     const likes = wajdAdminSnapshot(interactionDocs.filter(item => item.ref.parent.id === 'likes' && discoverableArticleIds.has(wajdAdminArticleFromRef(item))));
     const views = wajdAdminSnapshot(interactionDocs.filter(item => item.ref.parent.id === 'views' && discoverableArticleIds.has(wajdAdminArticleFromRef(item))));
@@ -1085,6 +1199,10 @@ async function wajdAdminLoad() {
       audienceSessionsIndexFallback:Boolean(audienceSessionsSnapshot.indexFallback),
       loadWarnings:interactionData.failures.concat(audienceSessionsSnapshot.indexUnavailable ? [{label:'audience-sessions',error:'index-unavailable'}] : [])
     };
+    if (!wajdAdminCacheServed && Object.keys(wajdAdminCacheFresh).length && !wajdAdminData.loadWarnings.length) {
+      wajdAdminCacheSavedAt = Date.now();
+      wajdAdminCacheIo('readwrite', wajdAdminCacheKey('main'), { version:WAJD_ADMIN_CACHE_VERSION, at:wajdAdminCacheSavedAt, parts:wajdAdminCacheFresh });
+    }
     wajdAdminRenderView();
   } catch (error) {
     console.error('Wajd admin center:',error);
@@ -1142,8 +1260,9 @@ function wajdAdminBindContent() {
       if (button.dataset.adminAudienceRange) { const range=Number(button.dataset.adminAudienceRange); wajdAdminAudienceRange=[7,30,90].includes(range)?range:30; wajdAdminRenderView(); const active=wajdAdminContent.querySelector('[data-admin-audience-range="'+wajdAdminAudienceRange+'"]'); if(active)active.focus({preventScroll:true}); return; }
       if (button.dataset.adminAudienceFilter) { wajdAdminAudienceFilter=button.dataset.adminAudienceFilter; wajdAdminAudienceSelected=''; wajdAdminRenderView(); return; }
       const action=button.dataset.adminAction; if (!action) return; button.disabled=true;
-      if (action==='audience-detail') { wajdAdminAudienceSelected=button.dataset.readerId||''; wajdAdminReaderVisits.delete(wajdAdminAudienceSelected); button.disabled=false; wajdAdminRenderView(); return; }
+      if (action==='audience-detail') { wajdAdminAudienceSelected=button.dataset.readerId||''; { const cached=wajdAdminReaderVisits.get(wajdAdminAudienceSelected); if (cached && !cached.loading && Date.now()-(cached.at||0) > 10*60*1000) wajdAdminReaderVisits.delete(wajdAdminAudienceSelected); } button.disabled=false; wajdAdminRenderView(); return; }
       if (action==='audience-back') { wajdAdminAudienceSelected=''; button.disabled=false; wajdAdminRenderView(); return; }
+      if (['hide-comment','show-comment','delete-comment','unblock-reader','block-reader'].includes(action)) wajdAdminCacheClear();
       if (action==='hide-comment' || action==='show-comment') await wajdAdminSetCommentStatus(button.dataset.commentScope,button.dataset.commentId,action==='hide-comment'?'hidden':'visible');
       else if (action==='delete-comment') await wajdAdminDeleteComment(button.dataset.commentScope,button.dataset.commentId);
       else if (action==='unblock-reader') await wajdAdminUnblockReader(button.dataset.readerId);
