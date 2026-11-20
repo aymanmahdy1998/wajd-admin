@@ -1092,17 +1092,8 @@ async function wajdPathsAdminLoad(){
   await wajdPathsInitialize();
   const user=window.wajdFirebaseUserPromise?await window.wajdFirebaseUserPromise:wajdPathsAuth.currentUser;
   if(!user||!wajdIsAdmin(user))throw new Error('admin-only');
-  let snap=await getDocs(collection(wajdPathsDb,'readingPaths'));
-  const bootstrapRef=doc(wajdPathsDb,'readingPathSystem','bootstrap');
-  const bootstrap=await getDoc(bootstrapRef);
-  if(!bootstrap.exists()){
-    const batch=writeBatch(wajdPathsDb);
-    if(snap.empty)PB.defaults.forEach(path=>{const data={...path,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};delete data.id;batch.set(doc(wajdPathsDb,'readingPaths',path.id),data);});
-    batch.set(bootstrapRef,{schemaVersion:1,seededAt:serverTimestamp()});
-    await batch.commit();
-    if(snap.empty)snap=await getDocs(collection(wajdPathsDb,'readingPaths'));
-  }
-  wajdPathsAdmin=wajdPathsSorted(wajdPathsSyncCurrentTitles(snap.docs.map(item=>({id:item.id,...item.data()}))));
+  // v119: the published paths are defined in reading-paths.js (wajdPathsDefaults), not Firestore.
+  wajdPathsAdmin=wajdPathsSorted(wajdPathsSyncCurrentTitles(PB.defaults.map(path=>({...path}))));
   if(!wajdPathsSelected||!wajdPathsAdmin.some(item=>item.id===wajdPathsSelected))wajdPathsSelected=wajdPathsAdmin[0]&&wajdPathsAdmin[0].id||'';
   await wajdPathsLoadPosts();
 }
@@ -1151,7 +1142,11 @@ async function wajdPathsAnalyticsLoad(){
   wajdPathsAnalyticsData={paths,byPath:new Map(results.map(item=>[item[0],item[1]])),limited:results.some(item=>item[2])};
 }
 window.wajdReadingPathsAnalyticsRender=async function(){const root=document.getElementById('wajd-paths-analytics-root');if(!root)return;root.innerHTML='<div class="wajd-admin-state">جارٍ تحليل فتح المسارات والتقدم داخلها…</div>';try{await wajdPathsAnalyticsLoad();wajdPathsAnalyticsPaint();}catch(error){console.error('Wajd path analytics admin:',error);root.innerHTML='<div class="wajd-admin-state">تعذّر تحميل تحليلات المسارات. انشر قواعد Firestore v73 أولًا ثم اضغط «تحديث».</div>';}};
-window.wajdReadingPathsAdminRender=async function(){const root=document.getElementById('wajd-paths-admin-root');if(!root)return;root.innerHTML='<div class="wajd-admin-state">جارٍ تحميل المسودة والمسارات…</div>';try{await wajdPathsAdminLoad();wajdPathsAdminPaint();}catch(error){console.error('Wajd paths admin:',error);root.innerHTML='<div class="wajd-admin-state">تعذّر تحميل المسارات. انشر قواعد Firestore v73 أولًا ثم اضغط «تحديث».</div>';}};
+window.wajdReadingPathsAdminRender=async function(){const root=document.getElementById('wajd-paths-admin-root');if(!root)return;try{await wajdPathsAdminLoad();}catch(error){root.innerHTML='<div class="wajd-admin-state">تعذّر تحميل المسارات.</div>';return;}
+  /* v119: read-only. Paths are edited in reading-paths.js (ask Claude), so the old Firestore editor is retired. */
+  const e=wajdPathsEscape,n=value=>wajdPathsArabic.format(value);
+  root.innerHTML='<div class="wajd-admin-state" style="text-align:right;line-height:1.9">المسارات أصبحت محفوظة في الكود (ملف reading-paths.js)، والتعديل من هنا متوقف. لإضافة مقالة أو تعديل مسار اطلب ذلك من Claude.</div>'+wajdPathsAdmin.map(path=>'<section class="wajd-admin-panel" style="margin-top:14px"><h3 style="margin:0 0 6px">'+e(path.title)+' <small style="font-weight:400">· '+n((path.items||[]).length)+' في الرحلة · '+n((path.extras||[]).length)+' إضافية</small></h3><ol style="margin:0 0 8px;padding-inline-start:22px">'+(path.items||[]).map(item=>'<li><a href="'+e(item.url)+'" target="_blank" rel="noopener">'+e(item.title)+'</a></li>').join('')+'</ol>'+((path.extras||[]).length?'<p style="margin:0;font-size:13px">إضافية: '+path.extras.map(item=>'<a href="'+e(item.url)+'" target="_blank" rel="noopener">'+e(item.title)+'</a>').join(' · ')+'</p>':'')+'</section>').join('');};
+window.wajdReadingPathsAdminRenderLegacy=async function(){const root=document.getElementById('wajd-paths-admin-root');if(!root)return;root.innerHTML='<div class="wajd-admin-state">جارٍ تحميل المسودة والمسارات…</div>';try{await wajdPathsAdminLoad();wajdPathsAdminPaint();}catch(error){console.error('Wajd paths admin:',error);root.innerHTML='<div class="wajd-admin-state">تعذّر تحميل المسارات. انشر قواعد Firestore v73 أولًا ثم اضغط «تحديث».</div>';}};
 async function wajdPathsAdminSave(path){const slug=String(path.slug||path.id).trim().slice(0,120);if(!/^[\p{L}\p{N}][\p{L}\p{N}_-]{0,119}$/u.test(slug))throw new Error('invalid-path-slug');if(wajdPathsAdmin.some(item=>item.id!==path.id&&String(item.slug||item.id).trim().toLowerCase()===slug.toLowerCase()))throw new Error('duplicate-path-slug');path.slug=slug;const data={title:String(path.title||'').slice(0,120),slug,prompt:String(path.prompt||wajdPathsNeed(path)).slice(0,180),audience:String(path.audience||wajdPathsAudience(path)).slice(0,400),depth:['خفيف','متوسط','عميق'].includes(path.depth)?path.depth:wajdPathsDepth(path),mood:String(path.mood||wajdPathsMood(path)).slice(0,80),description:String(path.description||'').slice(0,600),promise:String(path.promise||'').slice(0,600),kind:path.kind==='collection'?'collection':'path',status:path.status==='published'?'published':'draft',featured:path.featured!==false,order:Math.max(1,Number(path.order)||1),duration:Math.max(0,Number(path.duration)||0),items:(path.items||[]).slice(0,100).map(item=>({title:String(item.title||'').slice(0,250),url:String(item.url||'').slice(0,1500)})),updatedAt:serverTimestamp()};await setDoc(doc(wajdPathsDb,'readingPaths',path.id),data,{merge:true});}
 async function wajdPathsAdminDelete(pathId){const participants=await getDocs(collection(wajdPathsDb,'readingPathAnalytics',pathId,'participants'));for(let offset=0;offset<participants.docs.length;offset+=200){const batch=writeBatch(wajdPathsDb);participants.docs.slice(offset,offset+200).forEach(item=>{batch.delete(item.ref);batch.delete(doc(wajdPathsDb,'users',item.id,'pathAnalytics',pathId));});await batch.commit();}await deleteDoc(doc(wajdPathsDb,'readingPaths',pathId));}
 document.addEventListener('click',async event=>{

@@ -270,6 +270,7 @@ const WAJD_AUDIENCE_READING_IDLE_TIMEOUT = 3 * 60 * 1000;
 const WAJD_JOURNEY_SAVE_INTERVAL = 60 * 1000;
 const WAJD_COMPLETED_ARTICLES_PREFIX = 'wajd-completed-articles-v119:';
 const WAJD_JOURNEY_UNSENT_PREFIX = 'wajd-journey-unsent-v119:';
+const WAJD_COMPLETED_URLS_PREFIX = 'wajd-completed-urls-v119:';
 const WAJD_NOTIFICATIONS_REFRESH_INTERVAL = 2 * 60 * 1000;
 let wajdAudienceTracker = null;
 let wajdAudienceStartPromise = null;
@@ -2269,6 +2270,14 @@ function wajdJourneySample(tracker, activeOverride) {
   if (isArticle && !visit.completed && visit.maxProgress === 1 && visit.reading >= wajdJourneyCompletionSeconds()) {
     visit.completed = true; visit.revision++; saveNow = true;
     wajdLocalCompletedAdd(tracker.user.uid, visit.base.articleId);
+    // v119: reading paths track completion by article link, for every reader.
+    try {
+      const pathKey = WAJD_COMPLETED_URLS_PREFIX + tracker.user.uid;
+      const urls = JSON.parse(localStorage.getItem(pathKey) || '[]');
+      const here = decodeURIComponent(new URL(visit.base.pageUrl).pathname).replace(/\/$/, '');
+      if (Array.isArray(urls) && !urls.includes(here)) { urls.push(here); localStorage.setItem(pathKey, JSON.stringify(urls.slice(-500))); }
+      window.dispatchEvent(new CustomEvent('wajd-article-completed', { detail:{ articleId:visit.base.articleId, path:here } }));
+    } catch (error) {}
     tracker.completedArticles = Math.max(tracker.completedArticles, wajdLocalCompletedRead(tracker.user.uid).length);
     tracker.lastCompleted = true; tracker.dirtyRevision++;
     window.setTimeout(() => wajdAudienceFlush(false).catch(error => console.warn('Wajd audience completion:', error)), 0);
