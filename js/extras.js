@@ -7,6 +7,7 @@ const WAJD_EXTRAS_CSS = `
 .wajd-home-topics a{flex:0 0 auto;padding:8px 14px;border:1px solid var(--wajd-line);border-radius:999px;background:#fffaf5;color:var(--wajd-ink)!important;font:600 13.5px/1.3 Tajawal,sans-serif;text-decoration:none;white-space:nowrap}
 .wajd-home-topics a:active{background:var(--wajd-accent);color:#fff!important}
 @media(max-width:1023px){.wajd-home-topics{display:flex}}
+.wajd-card-rt{white-space:nowrap}
 .wajd-home-author{display:flex;align-items:center;gap:16px;margin:26px 0 8px;padding:18px;border:1px solid var(--wajd-line);border-radius:16px;background:#fffaf5}
 .wajd-home-author img{flex:0 0 auto;width:68px;height:68px;border-radius:50%;object-fit:cover;border:2px solid var(--wajd-line)}
 .wajd-home-author small{display:block;color:var(--wajd-muted);font:600 12px Tajawal,sans-serif;margin-bottom:2px}
@@ -197,7 +198,54 @@ function wajdExtrasInstall() {
   if (/[?&]app(=|&|$)/.test(location.search) && !wajdExtrasStandalone()) setTimeout(wajdExtrasInstallSheet, 1200);
 }
 
+/* ---------- Reading time on post cards (home, categories, older posts) ----------
+   Blogger list pages only carry a snippet, so each card's post is read once from the public Blogger feed
+   (no Firebase) and the minutes are kept on this device. Same estimate as the article page (account.js). */
+const WAJD_RT_KEY = 'wajd-reading-time-v1';
+const wajdRtNumber = new Intl.NumberFormat('ar-EG');
+function wajdRtLabel(minutes) {
+  const unit = minutes === 1 ? 'دقيقة' : minutes === 2 ? 'دقيقتان' : minutes <= 10 ? 'دقائق' : 'دقيقة';
+  return minutes === 2 ? unit : wajdRtNumber.format(minutes) + ' ' + unit;
+}
+function wajdRtMinutes(html) {
+  const doc = new DOMParser().parseFromString(html || '', 'text/html');
+  const text = (doc.body.textContent || '').trim();
+  const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+  const seconds = words / 180 * 60 + doc.querySelectorAll('img').length * 11 + doc.querySelectorAll('h2,h3,h4').length * 3;
+  return Math.max(1, Math.ceil(seconds / 60));
+}
+async function wajdExtrasReadingTimes() {
+  if (document.body.classList.contains('post')) return;
+  const cards = [...document.querySelectorAll('.Posts-byCategory > article.posts[data-post-id]')];
+  if (!cards.length) return;
+  let store = {};
+  try { store = JSON.parse(localStorage.getItem(WAJD_RT_KEY) || '{}') || {}; } catch (error) {}
+  const month = 30 * 86400000;
+  const show = (card, minutes) => {
+    const date = card.querySelector('.Date');
+    if (!date || date.querySelector('.wajd-card-rt')) return;
+    const span = document.createElement('span');
+    span.className = 'wajd-card-rt';
+    span.textContent = ' · ' + wajdRtLabel(minutes);
+    date.appendChild(span);
+  };
+  await Promise.all(cards.map(async card => {
+    const id = card.dataset.postId, cached = store[id];
+    if (cached && Date.now() - cached.t < month) { show(card, cached.m); return; }
+    try {
+      const response = await fetch('/feeds/posts/default/' + encodeURIComponent(id) + '?alt=json');
+      if (!response.ok) return;
+      const entry = (await response.json()).entry;
+      const minutes = wajdRtMinutes(entry && entry.content && entry.content.$t);
+      store[id] = { m: minutes, t: Date.now() };
+      show(card, minutes);
+    } catch (error) {}
+  }));
+  try { localStorage.setItem(WAJD_RT_KEY, JSON.stringify(store)); } catch (error) {}
+}
+
 wajdExtrasStyles();
 try { wajdExtrasHome(); } catch (error) { console.warn('Wajd home extras:', error); }
 try { wajdExtrasQuotes(); } catch (error) { console.warn('Wajd quote sharing:', error); }
 try { wajdExtrasInstall(); } catch (error) { console.warn('Wajd install:', error); }
+wajdExtrasReadingTimes().catch(error => console.warn('Wajd reading times:', error));
