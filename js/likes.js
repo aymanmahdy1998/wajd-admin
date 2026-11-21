@@ -35,8 +35,11 @@ function wajdRenderViews(viewNode, count) {
   if (!viewNode) return;
   const safeCount = Math.max(0, Number(count) || 0);
   const numberNode = document.getElementById('wajd-view-number');
-  if (numberNode) numberNode.textContent = wajdArabicNumber.format(safeCount) + ' مشاهدة';
-  viewNode.setAttribute('aria-label', wajdArabicNumber.format(safeCount) + ' مشاهدة لهذا المقال');
+  // v121: Arabic plural, and no "٠ مشاهدة" on a brand-new article.
+  const label = safeCount === 1 ? 'مشاهدة واحدة' : safeCount === 2 ? 'مشاهدتان' : wajdArabicNumber.format(safeCount) + (safeCount >= 3 && safeCount <= 10 ? ' مشاهدات' : ' مشاهدة');
+  if (numberNode) numberNode.textContent = label;
+  viewNode.hidden = safeCount === 0;
+  viewNode.setAttribute('aria-label', label + ' لهذا المقال');
   viewNode.setAttribute('aria-busy', 'false');
 }
 

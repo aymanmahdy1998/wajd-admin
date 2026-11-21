@@ -245,7 +245,16 @@ async function wajdExtrasReadingTimes() {
   try { localStorage.setItem(WAJD_RT_KEY, JSON.stringify(store)); } catch (error) {}
 }
 
+/* The author photo in the article header only has data-src; the theme's lazy loader skips it on desktop. */
+function wajdExtrasAuthorPhoto() {
+  document.querySelectorAll('.article-author img[data-src]:not([src]), img.authorPhoto[data-src]:not([src])').forEach(img => {
+    const src = img.getAttribute('data-src');
+    if (src) img.src = src.startsWith('//') ? 'https:' + src : src;
+  });
+}
+
 wajdExtrasStyles();
+try { wajdExtrasAuthorPhoto(); } catch (error) {}
 try { wajdExtrasHome(); } catch (error) { console.warn('Wajd home extras:', error); }
 try { wajdExtrasQuotes(); } catch (error) { console.warn('Wajd quote sharing:', error); }
 try { wajdExtrasInstall(); } catch (error) { console.warn('Wajd install:', error); }
