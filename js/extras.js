@@ -7,7 +7,8 @@ const WAJD_EXTRAS_CSS = `
 .wajd-home-topics a{flex:0 0 auto;padding:8px 14px;border:1px solid var(--wajd-line);border-radius:999px;background:#fffaf5;color:var(--wajd-ink)!important;font:600 13.5px/1.3 Tajawal,sans-serif;text-decoration:none;white-space:nowrap}
 .wajd-home-topics a:active{background:var(--wajd-accent);color:#fff!important}
 @media(max-width:1023px){.wajd-home-topics{display:flex}}
-.wajd-card-rt{white-space:nowrap}
+.wajd-card-rt{white-space:nowrap;unicode-bidi:isolate}
+.wajd-card-rt::before{content:'';display:inline-block;width:4px;height:4px;margin:0 8px 3px;border-radius:50%;background:currentColor;opacity:.55;vertical-align:middle}
 .wajd-home-author{display:flex;align-items:center;gap:16px;margin:26px 0 8px;padding:18px;border:1px solid var(--wajd-line);border-radius:16px;background:#fffaf5}
 .wajd-home-author img{flex:0 0 auto;width:68px;height:68px;border-radius:50%;object-fit:cover;border:2px solid var(--wajd-line)}
 .wajd-home-author small{display:block;color:var(--wajd-muted);font:600 12px Tajawal,sans-serif;margin-bottom:2px}
@@ -226,7 +227,7 @@ async function wajdExtrasReadingTimes() {
     if (!date || date.querySelector('.wajd-card-rt')) return;
     const span = document.createElement('span');
     span.className = 'wajd-card-rt';
-    span.textContent = ' · ' + wajdRtLabel(minutes);
+    span.textContent = wajdRtLabel(minutes);
     date.appendChild(span);
   };
   await Promise.all(cards.map(async card => {
