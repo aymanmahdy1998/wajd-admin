@@ -301,7 +301,7 @@ function wajdExtrasFooter() {
   const topics = WAJD_HOME_TOPICS.map(([label, tag]) => '<a href="/search/label/' + encodeURIComponent(tag) + '">' + wajdExtrasEscape(label) + '</a>').join('');
   const install = wajdExtrasStandalone() ? '' : '<button data-footer-install type="button">ثبّت وَجْد على هاتفك</button>';
   nav.innerHTML = '<div><h4>أقسام وَجْد</h4>' + topics + '</div>'
-    + '<div><h4>وَجْد</h4><a href="/search">كل الكتابات</a><a href="/#wajd-reading-paths">مسارات القراءة</a><a href="' + WAJD_AUTHOR.about + '">عن وَجْد</a><a href="' + WAJD_TELEGRAM + '" rel="noopener" target="_blank">قناة تيليجرام</a>' + install + '</div>';
+    + '<div><h4>وَجْد</h4><a href="/search">كل الكتابات</a><a href="/#wajd-reading-paths">مسارات القراءة</a><a href="' + WAJD_AUTHOR.about + '">عن وَجْد</a>' + install + '</div>';
   const button = nav.querySelector('[data-footer-install]');
   if (button) button.addEventListener('click', wajdExtrasInstallSheet);
   const meta = footer.querySelector('.wajd-footer-meta');
