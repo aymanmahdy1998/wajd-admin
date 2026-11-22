@@ -7,6 +7,27 @@ const WAJD_EXTRAS_CSS = `
 .wajd-home-topics a{flex:0 0 auto;padding:8px 14px;border:1px solid var(--wajd-line);border-radius:999px;background:#fffaf5;color:var(--wajd-ink)!important;font:600 13.5px/1.3 Tajawal,sans-serif;text-decoration:none;white-space:nowrap}
 .wajd-home-topics a:active{background:var(--wajd-accent);color:#fff!important}
 @media(max-width:1023px){.wajd-home-topics{display:flex}}
+.wajd-follow-card{order:1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:18px 0;padding:18px 20px;border:1px solid var(--wajd-line);border-radius:16px;background:linear-gradient(135deg,rgba(149,83,64,.08),rgba(149,83,64,.02))}
+.wajd-follow-card strong{display:block;color:var(--wajd-ink);font:700 18px/1.5 'Noto Naskh Arabic',serif}
+.wajd-follow-card small{display:block;margin-top:2px;color:var(--wajd-muted);font:400 14px/1.7 Tajawal,sans-serif}
+.wajd-follow-actions{display:flex;gap:8px;flex-wrap:wrap}
+.wajd-follow-actions a,.wajd-follow-actions button{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:999px;font:700 14px Tajawal,sans-serif;text-decoration:none;cursor:pointer}
+.wajd-follow-actions a{background:var(--wajd-accent);color:#fff!important;border:0}
+.wajd-follow-actions button{background:none;color:var(--wajd-accent);border:1px solid var(--wajd-accent)}
+.wajd-follow-actions svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.wajd-footer-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 40px;margin:18px 0 6px}
+.wajd-footer-links h4{margin:0 0 8px;color:#f3e6da;font:700 14px Tajawal,sans-serif;opacity:.75}
+.wajd-footer-links a,.wajd-footer-links button{display:block;padding:4px 0;border:0;background:none;color:#f7f3ec!important;font:500 14.5px/1.6 Tajawal,sans-serif;text-align:start;text-decoration:none;cursor:pointer;opacity:.9}
+.wajd-footer-links a:hover,.wajd-footer-links button:hover{opacity:1;text-decoration:underline}
+.wajd-404{max-width:560px;margin:10px auto 30px;text-align:center}
+.wajd-404 .wajd-404-mark{font:700 64px/1 'Noto Naskh Arabic',serif;color:var(--wajd-accent);opacity:.9}
+.wajd-404 h1{margin:14px 0 8px!important;color:var(--wajd-ink);font:700 26px/1.5 'Noto Naskh Arabic',serif!important}
+.wajd-404 p{margin:0 0 18px;color:var(--wajd-muted);font:400 16px/1.9 Tajawal,sans-serif}
+.wajd-404 form{display:flex;gap:8px;margin:0 auto 14px;max-width:420px}
+.wajd-404 input{flex:1;min-width:0;padding:11px 14px;border:1px solid var(--wajd-line);border-radius:12px;background:#fffaf5;color:var(--wajd-ink);font:500 15px Tajawal,sans-serif}
+.wajd-404 button,.wajd-404 .wajd-404-home{padding:11px 18px;border:0;border-radius:12px;background:var(--wajd-accent);color:#fff!important;font:700 15px Tajawal,sans-serif;text-decoration:none;cursor:pointer}
+.wajd-404 .wajd-404-home{display:inline-block;background:none;color:var(--wajd-accent)!important;border:1px solid var(--wajd-accent)}
+body.dark-mode .wajd-404 input{background:var(--MinBgColor)}
 .wajd-card-rt{white-space:nowrap;unicode-bidi:isolate}
 .wajd-card-rt::before{content:'';display:inline-block;width:4px;height:4px;margin:0 8px 3px;border-radius:50%;background:currentColor;opacity:.55;vertical-align:middle}
 .wajd-home-author{display:flex;align-items:center;gap:16px;margin:26px 0 8px;padding:18px;border:1px solid var(--wajd-line);border-radius:16px;background:#fffaf5}
@@ -253,9 +274,59 @@ function wajdExtrasAuthorPhoto() {
   });
 }
 
+/* ---------- End of article: follow Wajd (Telegram channel + install as an app) ---------- */
+const WAJD_TELEGRAM = 'https://t.me/WajdCh';
+function wajdExtrasFollowCard() {
+  if (!document.body.classList.contains('post') || document.querySelector('.wajd-follow-card')) return;
+  const like = document.getElementById('wajd-like-panel');
+  if (!like || !like.parentNode) return;
+  const card = document.createElement('section');
+  card.className = 'wajd-follow-card';
+  card.setAttribute('aria-label', 'تابع وَجْد');
+  const install = wajdExtrasStandalone() ? '' : '<button data-follow-install type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M12 8v6M9.5 11.5 12 14l2.5-2.5"/></svg>ثبّت وَجْد على هاتفك</button>';
+  card.innerHTML = '<div><strong>أعجبتك الكتابة؟ تابع وَجْد</strong><small>تصلك الكتابات الجديدة أولًا بأول على قناة تيليجرام.</small></div>'
+    + '<div class="wajd-follow-actions"><a href="' + WAJD_TELEGRAM + '" rel="noopener" target="_blank"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21 4 3 11l6 2 2 6 3-4 5 4z"/></svg>قناة تيليجرام</a>' + install + '</div>';
+  const button = card.querySelector('[data-follow-install]');
+  if (button) button.addEventListener('click', wajdExtrasInstallSheet);
+  like.parentNode.insertBefore(card, like.nextSibling);
+}
+
+/* ---------- Footer: topics and site links ---------- */
+function wajdExtrasFooter() {
+  const footer = document.querySelector('.wajd-footer');
+  if (!footer || footer.querySelector('.wajd-footer-links')) return;
+  const nav = document.createElement('nav');
+  nav.className = 'wajd-footer-links';
+  nav.setAttribute('aria-label', 'روابط وَجْد');
+  const topics = WAJD_HOME_TOPICS.map(([label, tag]) => '<a href="/search/label/' + encodeURIComponent(tag) + '">' + wajdExtrasEscape(label) + '</a>').join('');
+  const install = wajdExtrasStandalone() ? '' : '<button data-footer-install type="button">ثبّت وَجْد على هاتفك</button>';
+  nav.innerHTML = '<div><h4>أقسام وَجْد</h4>' + topics + '</div>'
+    + '<div><h4>وَجْد</h4><a href="/search">كل الكتابات</a><a href="/#wajd-reading-paths">مسارات القراءة</a><a href="' + WAJD_AUTHOR.about + '">عن وَجْد</a><a href="' + WAJD_TELEGRAM + '" rel="noopener" target="_blank">قناة تيليجرام</a>' + install + '</div>';
+  const button = nav.querySelector('[data-footer-install]');
+  if (button) button.addEventListener('click', wajdExtrasInstallSheet);
+  const meta = footer.querySelector('.wajd-footer-meta');
+  footer.insertBefore(nav, meta || null);
+}
+
+/* ---------- Page not found: a gentle message, search and a way home ---------- */
+function wajdExtrasNotFound() {
+  const box = document.getElementById('error-page');
+  if (!box || box.dataset.wajd) return;
+  box.dataset.wajd = '1';
+  box.className = 'wajd-404';
+  box.innerHTML = '<div class="wajd-404-mark" aria-hidden="true">؟</div>'
+    + '<h1>هذه الصفحة ليست هنا</h1>'
+    + '<p>ربما تغيّر رابط الكتابة أو لم تعد موجودة. ابحث عنها بكلمة من عنوانها، أو ابدأ من أحدث الكتابات.</p>'
+    + '<form action="/search" method="get" role="search"><input aria-label="ابحث في وَجْد" name="q" placeholder="ابحث في وَجْد…" type="search"><button type="submit">بحث</button></form>'
+    + '<a class="wajd-404-home" href="/">الصفحة الرئيسية</a>';
+}
+
 wajdExtrasStyles();
 try { wajdExtrasAuthorPhoto(); } catch (error) {}
 try { wajdExtrasHome(); } catch (error) { console.warn('Wajd home extras:', error); }
 try { wajdExtrasQuotes(); } catch (error) { console.warn('Wajd quote sharing:', error); }
 try { wajdExtrasInstall(); } catch (error) { console.warn('Wajd install:', error); }
+try { wajdExtrasFollowCard(); } catch (error) { console.warn('Wajd follow card:', error); }
+try { wajdExtrasFooter(); } catch (error) { console.warn('Wajd footer:', error); }
+try { wajdExtrasNotFound(); } catch (error) { console.warn('Wajd 404:', error); }
 wajdExtrasReadingTimes().catch(error => console.warn('Wajd reading times:', error));
