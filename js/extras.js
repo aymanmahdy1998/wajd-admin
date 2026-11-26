@@ -9,7 +9,8 @@ const WAJD_EXTRAS_CSS = `
 @media(max-width:1023px){.wajd-home-topics{display:flex}}
 /* v122: a quiet end of article — path box (if any), one action row, one next reading, comments. */
 body.post .hideensa .post-tags,body.post .hideensa .pSh,body.post .hideensa .page-navigation,body.post .wajd-next-reading-note,body.post .wajd-next-secondary{display:none!important}
-body.post .wajd-article-path[data-has-next] ~ .hideensa .wajd-next-reading{display:none!important}
+body.post .wajd-article-path[data-has-next] ~ .wajd-next-reading{display:none!important}
+body.post .commentsection ~ .wajd-article-path{margin-top:20px}
 body.post .wajd-next-reading-grid{grid-template-columns:minmax(0,1fr)!important}
 body.post .wajd-like-panel{display:flex!important;flex-direction:row!important;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px!important;padding:14px!important}
 body.post .wajd-like-panel .wajd-reader-action{display:contents}
@@ -326,11 +327,23 @@ function wajdExtrasNotFound() {
     + '<a class="wajd-404-home" href="/">الصفحة الرئيسية</a>';
 }
 
+/* ---------- After the text: like row, then comments; every suggestion comes after them ---------- */
+function wajdExtrasEndOrder() {
+  if (!document.body.classList.contains('post')) return;
+  const comments = document.querySelector('.post .commentsection');
+  const next = document.querySelector('.post .wajd-next-reading');
+  if (!comments || !next) return;
+  const box = document.getElementById('wajd-article-path');
+  if (box && comments.nextElementSibling !== box) comments.insertAdjacentElement('afterend', box);
+  (box || comments).insertAdjacentElement('afterend', next);
+}
+
 wajdExtrasStyles();
 try { wajdExtrasAuthorPhoto(); } catch (error) {}
 try { wajdExtrasHome(); } catch (error) { console.warn('Wajd home extras:', error); }
 try { wajdExtrasQuotes(); } catch (error) { console.warn('Wajd quote sharing:', error); }
 try { wajdExtrasInstall(); } catch (error) { console.warn('Wajd install:', error); }
+try { wajdExtrasEndOrder(); } catch (error) { console.warn('Wajd end order:', error); }
 try { wajdExtrasShareButton(); } catch (error) { console.warn('Wajd share button:', error); }
 try { wajdExtrasFooter(); } catch (error) { console.warn('Wajd footer:', error); }
 try { wajdExtrasNotFound(); } catch (error) { console.warn('Wajd 404:', error); }
