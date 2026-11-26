@@ -1,31 +1,16 @@
 /* WAJD v121: the «كل الكتابات» archive (/search). Moved out of the theme so it can change without a theme upload.
-   Year buttons with counts, a 12-month rhythm strip, every month open, forgiving Arabic search.
+   Year buttons, every month open with its count, forgiving Arabic search.
    No Firebase reads: posts come from the public Blogger feed; read marks are applied by core.js. */
 
 const WAJD_ARCHIVE_CSS = `
-.wajd-archive-year{display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
-.wajd-archive-year small{font-size:11.5px;font-weight:600;opacity:.65}
-.wajd-archive-rhythm{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}
-.wajd-archive-cell{display:grid;gap:5px;justify-items:stretch;padding:0;border:0;background:none;cursor:pointer;font-family:Tajawal,sans-serif}
-.wajd-archive-cell i{display:flex;align-items:center;justify-content:center;height:34px;border-radius:9px;border:1px solid var(--wajd-line);color:var(--wajd-ink);font-style:normal;font-size:13px;font-weight:700}
-.wajd-archive-cell span{overflow:hidden;font-weight:600;color:var(--wajd-muted);font-size:11.5px;text-align:center;white-space:nowrap}
-.wajd-archive-cell[disabled]{cursor:default;opacity:.45}
-.wajd-archive-cell[data-heat="1"] i{background:rgba(149,83,64,.14);border-color:transparent}
-.wajd-archive-cell[data-heat="2"] i{background:rgba(149,83,64,.30);border-color:transparent}
-.wajd-archive-cell[data-heat="3"] i{background:rgba(149,83,64,.62);border-color:transparent;color:#fff}
-.wajd-archive-cell[data-heat="4"] i{background:#8a4b39;border-color:transparent;color:#fff}
-.wajd-archive-cell:not([disabled]):hover i{outline:2px solid var(--wajd-accent);outline-offset:1px}
-.wajd-archive-section{scroll-margin-top:96px;overflow:hidden;border:1px solid var(--wajd-line);border-radius:16px;background:var(--wajd-paper)}
+.wajd-archive-year{cursor:pointer}
+.wajd-archive-year-heading small{margin-inline-start:12px;color:var(--wajd-muted);font:600 13.5px Tajawal,sans-serif}
+.wajd-archive-section{overflow:hidden;border:1px solid var(--wajd-line);border-radius:16px;background:var(--wajd-paper)}
 .wajd-archive-section>h4{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0;padding:14px 20px;border-bottom:1px solid var(--wajd-line);color:var(--wajd-ink);font-size:17px;font-weight:800}
 .wajd-archive-section>h4 small{color:var(--wajd-muted);font-size:12.5px;font-weight:600}
 .wajd-archive-label{font-size:12px}
 .wajd-archive-item.wajd-is-read .wajd-archive-label::after{content:'✓ مقروء';margin-inline-start:10px;color:var(--wajd-accent);font-weight:700;unicode-bidi:isolate}
 .wajd-archive-count{margin:0;color:var(--wajd-muted);font:600 13.5px Tajawal,sans-serif}
-body.dark-mode .wajd-archive-cell[data-heat="1"] i{background:rgba(210,148,121,.18)}
-body.dark-mode .wajd-archive-cell[data-heat="2"] i{background:rgba(210,148,121,.36)}
-body.dark-mode .wajd-archive-cell[data-heat="3"] i{background:rgba(184,115,90,.75)}
-body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1b19}
-@media(max-width:640px){.wajd-archive-rhythm{grid-template-columns:repeat(6,minmax(0,1fr))}.wajd-archive-cell i{height:32px}.wajd-archive-section>h4{padding:12px 16px;font-size:16px}}
 `;
 
 (function wajdArchive() {
@@ -48,7 +33,7 @@ body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1
     .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
     .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
-  let posts = [], years = [], activeYear = '', query = '', busiestMonth = 1, rhythm, results, input;
+  let posts = [], years = [], activeYear = '', query = '', results, input;
 
   const make = (tag, className, text) => {
     const element = document.createElement(tag);
@@ -84,9 +69,8 @@ body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1
     return row;
   }
 
-  function monthSection(month, list, anchor) {
+  function monthSection(month, list) {
     const section = make('section', 'wajd-archive-section');
-    if (anchor) section.id = 'wajd-month-' + month;
     const heading = make('h4', '', monthName(month));
     heading.appendChild(make('small', '', writings(list.length)));
     section.appendChild(heading);
@@ -96,27 +80,6 @@ body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1
     return section;
   }
 
-  function drawRhythm(yearPosts) {
-    rhythm.innerHTML = '';
-    for (let month = 0; month < 12; month += 1) {
-      const count = yearPosts.filter(post => post.month === month).length;
-      const cell = make('button', 'wajd-archive-cell');
-      cell.type = 'button';
-      cell.disabled = !count;
-      cell.dataset.heat = count ? String(Math.max(1, Math.ceil(count / busiestMonth * 4))) : '0';
-      const label = monthName(month) + ': ' + (count ? writings(count) : 'لا توجد كتابات');
-      cell.setAttribute('aria-label', label);
-      cell.title = label;
-      cell.appendChild(make('i', '', count ? number.format(count) : ''));
-      cell.appendChild(make('span', '', monthName(month)));
-      cell.addEventListener('click', () => {
-        const target = document.getElementById('wajd-month-' + month);
-        if (target) target.scrollIntoView({ behavior:'smooth', block:'start' });
-      });
-      rhythm.appendChild(cell);
-    }
-  }
-
   function render() {
     results.innerHTML = '';
     root.querySelectorAll('.wajd-archive-year').forEach(button => {
@@ -124,24 +87,24 @@ body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1
       button.classList.toggle('is-active', selected);
       button.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
-    rhythm.hidden = Boolean(query);
-    rhythm.style.display = query ? 'none' : '';
     const words = query.split(' ').filter(Boolean);
     const visible = posts.filter(post => words.length ? words.every(word => post.search.includes(word)) : post.year === activeYear);
     if (query) {
       const count = make('p', 'wajd-archive-count', visible.length ? countLabel(visible.length, 'نتيجة واحدة', 'نتيجتان', 'نتائج', 'نتيجة') : 'لا توجد نتائج');
       count.setAttribute('role', 'status');
       results.appendChild(count);
-    } else drawRhythm(visible);
+    }
     if (!visible.length) {
       results.appendChild(make('div', 'wajd-archive-state', 'لم أجد كتابة بهذه الكلمات.'));
       return;
     }
     years.filter(year => visible.some(post => post.year === year)).forEach(year => {
       const yearPosts = visible.filter(post => post.year === year);
-      results.appendChild(make('h3', 'wajd-archive-year-heading', number.format(Number(year))));
+      const heading = make('h3', 'wajd-archive-year-heading', number.format(Number(year)));
+      heading.appendChild(make('small', '', writings(yearPosts.length)));
+      results.appendChild(heading);
       [...new Set(yearPosts.map(post => post.month))].sort((a, b) => b - a)
-        .forEach(month => results.appendChild(monthSection(month, yearPosts.filter(post => post.month === month), !query)));
+        .forEach(month => results.appendChild(monthSection(month, yearPosts.filter(post => post.month === month))));
     });
   }
 
@@ -150,7 +113,7 @@ body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1
     const shell = make('div', 'wajd-archive-shell');
     const intro = make('div', 'wajd-archive-intro');
     intro.appendChild(make('h2', '', 'الكتابات كما مرّت في الزمن'));
-    intro.appendChild(make('p', '', writings(posts.length) + ' منذ ' + number.format(Number(years[years.length - 1])) + '. اختر سنة، واضغط على أي شهر في الشريط لتنتقل إليه.'));
+    intro.appendChild(make('p', '', writings(posts.length) + ' منذ ' + number.format(Number(years[years.length - 1])) + '. اختر سنة لتتصفّح كتاباتها شهرًا بشهر.'));
     shell.appendChild(intro);
 
     const tools = make('div', 'wajd-archive-tools');
@@ -171,9 +134,6 @@ body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1
       const button = make('button', 'wajd-archive-year', number.format(Number(year)));
       button.type = 'button';
       button.dataset.year = year;
-      const total = posts.filter(post => post.year === year).length;
-      button.appendChild(make('small', '', number.format(total)));
-      button.setAttribute('aria-label', number.format(Number(year)) + ': ' + writings(total));
       button.addEventListener('click', () => {
         activeYear = year; query = ''; input.value = '';
         // The chosen year stays in the address, so «back» from an article returns to it.
@@ -183,10 +143,6 @@ body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1
       nav.appendChild(button);
     });
     tools.appendChild(nav);
-    rhythm = make('div', 'wajd-archive-rhythm');
-    rhythm.setAttribute('role', 'group');
-    rhythm.setAttribute('aria-label', 'شهور السنة المختارة');
-    tools.appendChild(rhythm);
     shell.appendChild(tools);
     results = make('div', 'wajd-archive-results');
     shell.appendChild(results);
@@ -200,9 +156,6 @@ body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1
       posts = prepare(entries);
       years = [...new Set(posts.map(post => post.year))];
       if (!posts.length) { root.innerHTML = '<div class="wajd-archive-state">لا توجد كتابات في الأرشيف بعد.</div>'; return; }
-      const perMonth = {};
-      posts.forEach(post => { const key = post.year + '-' + post.month; perMonth[key] = (perMonth[key] || 0) + 1; });
-      busiestMonth = Math.max(...Object.values(perMonth));
       const wanted = (location.hash.match(/^#y(\d{4})$/) || [])[1];
       activeYear = years.includes(wanted) ? wanted : years[0];
       build();
