@@ -468,17 +468,8 @@ function wajdReadingSetup(){
   let lastSavedProgress=-1;
   let lastSavedAt=0;
   let lastSavedCompleted=false;
-  const complete=document.createElement('section');
-  complete.className='wajd-reading-complete';
-  complete.setAttribute('aria-live','polite');
-  complete.innerHTML='<span><strong>إكمال القراءة</strong><small>تُسجّل المقالة مكتملة تلقائيًا حين تصل إلى نهايتها بعد قراءتها، أو يمكنك تأكيدها يدويًا.</small></span><button type="button">أكملت القراءة</button>';
-  const anchor=document.getElementById('wajd-like-panel');
-  if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(complete,anchor);
-  else body.insertAdjacentElement('afterend',complete);
-  const completeButton=complete.querySelector('button');
-  const completeTitle=complete.querySelector('strong');
-  const completeHint=complete.querySelector('small');
-  const renderComplete=()=>{completeButton.classList.toggle('is-complete',completed);completeButton.textContent=completed?'اكتملت القراءة ✓':'أكملت القراءة';completeTitle.textContent=completed?'اكتملت قراءة المقال':'إكمال القراءة';completeHint.textContent=completed?'تم حفظها ضمن القراءات المكتملة في سجلك.':'تُسجّل المقالة مكتملة تلقائيًا حين تصل إلى نهايتها بعد قراءتها، أو يمكنك تأكيدها يدويًا.';};
+  // v122: no manual «أكملت القراءة» box. Completion is recorded automatically (see completeAtArticleEnd).
+  const renderComplete=()=>{};
   const metrics=()=>{
     const rect=body.getBoundingClientRect();
     const start=window.scrollY+rect.top;
@@ -574,24 +565,12 @@ function wajdReadingSetup(){
     if(completeAtArticleEnd(current)){window.clearTimeout(updateProgress.timer);return;}
     window.clearTimeout(updateProgress.timer);updateProgress.timer=window.setTimeout(()=>saveProgress(false).catch(error=>console.warn('Wajd reading progress:',error)),5000);
   };
-  completeButton.addEventListener('click',()=>{
-    const active=wajdReaderAuth&&wajdReaderAuth.currentUser;
-    if(!wajdReaderIsGoogle(active)){if(window.wajdRequireGoogleSignIn)window.wajdRequireGoogleSignIn('complete',postId);return;}
-    if(!wajdReaderUser||active.uid!==wajdReaderUser.uid){window.location.reload();return;}
-    completed=!completed;renderComplete();saveProgress(true).then(saved=>{
-      if(!saved){completed=!completed;renderComplete();return;}
-      if(completed){if(window.wajdAudienceRecordExplicitAction)window.wajdAudienceRecordExplicitAction('completed',postId);else if(window.wajdJourneyRecordAction)window.wajdJourneyRecordAction('completed',postId);}
-    }).catch(error=>{completed=!completed;renderComplete();console.error('Wajd complete reading:',error);});
-  });
   window.addEventListener('scroll',updateProgress,{passive:true});window.addEventListener('resize',updateProgress,{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveProgress(true).catch(()=>{});});
   (async()=>{
     try{
       const user=wajdReaderAuth.currentUser||await wajdReaderCore.userPromise;wajdReaderUser=user;
       if(!wajdReaderIsGoogle(user)){
-        completeTitle.textContent='احفظ تقدّمك';
-        completeHint.textContent='سجّل الدخول بحساب Google لحفظ التقدّم وسجل القراءة.';
-        completeButton.textContent='تسجيل الدخول لحفظ التقدّم';
         offerLocalResume();
         updateProgress();
         return;

@@ -260,6 +260,8 @@ function wajdPathsRenderArticleContext(){
   if(!path&&!extraOf){document.body.classList.remove('wajd-path-reading-mode');if(head)head.remove();if(box)box.remove();return;}
   // v119: right after the article text, where the reader still holds the meaning (CSS order 0).
   if(!box){box=document.createElement('section');box.id='wajd-article-path';body.insertAdjacentElement('afterend',box);}
+  // v122: when the box already offers the next step, the «خطوتك التالية» block below is hidden (extras.js).
+  box.toggleAttribute('data-has-next',Boolean(path&&path.items.findIndex(item=>wajdPathsNormalize(item.url)===current)<path.items.length-1));
   if(!path){
     document.body.classList.remove('wajd-path-reading-mode');if(head)head.remove();
     const first=(extraOf.items||[])[0];

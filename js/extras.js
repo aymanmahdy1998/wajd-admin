@@ -7,14 +7,16 @@ const WAJD_EXTRAS_CSS = `
 .wajd-home-topics a{flex:0 0 auto;padding:8px 14px;border:1px solid var(--wajd-line);border-radius:999px;background:#fffaf5;color:var(--wajd-ink)!important;font:600 13.5px/1.3 Tajawal,sans-serif;text-decoration:none;white-space:nowrap}
 .wajd-home-topics a:active{background:var(--wajd-accent);color:#fff!important}
 @media(max-width:1023px){.wajd-home-topics{display:flex}}
-.wajd-follow-card{order:1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:18px 0;padding:18px 20px;border:1px solid var(--wajd-line);border-radius:16px;background:linear-gradient(135deg,rgba(149,83,64,.08),rgba(149,83,64,.02))}
-.wajd-follow-card strong{display:block;color:var(--wajd-ink);font:700 18px/1.5 'Noto Naskh Arabic',serif}
-.wajd-follow-card small{display:block;margin-top:2px;color:var(--wajd-muted);font:400 14px/1.7 Tajawal,sans-serif}
-.wajd-follow-actions{display:flex;gap:8px;flex-wrap:wrap}
-.wajd-follow-actions a,.wajd-follow-actions button{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:999px;font:700 14px Tajawal,sans-serif;text-decoration:none;cursor:pointer}
-.wajd-follow-actions a{background:var(--wajd-accent);color:#fff!important;border:0}
-.wajd-follow-actions button{background:none;color:var(--wajd-accent);border:1px solid var(--wajd-accent)}
-.wajd-follow-actions svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+/* v122: a quiet end of article — path box (if any), one action row, one next reading, comments. */
+body.post .hideensa .post-tags,body.post .hideensa .pSh,body.post .hideensa .page-navigation,body.post .wajd-next-reading-note,body.post .wajd-next-secondary{display:none!important}
+body.post .wajd-article-path[data-has-next] ~ .hideensa .wajd-next-reading{display:none!important}
+body.post .wajd-next-reading-grid{grid-template-columns:minmax(0,1fr)!important}
+body.post .wajd-like-panel{display:flex!important;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px!important;padding:14px!important}
+body.post .wajd-like-panel .wajd-reader-action{display:contents}
+body.post .wajd-like-panel .wajd-like-copy{display:none!important}
+body.post .wajd-like-panel .wajd-like-button{width:auto!important;min-width:96px;margin:0!important}
+body.post .wajd-like-panel .wajd-like-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+body.post .wajd-share-button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .wajd-footer-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 40px;margin:18px 0 6px}
 .wajd-footer-links h4{margin:0 0 8px;color:#f3e6da;font:700 14px Tajawal,sans-serif;opacity:.75}
 .wajd-footer-links a,.wajd-footer-links button{display:block;padding:4px 0;border:0;background:none;color:#f7f3ec!important;font:500 14.5px/1.6 Tajawal,sans-serif;text-align:start;text-decoration:none;cursor:pointer;opacity:.9}
@@ -274,21 +276,21 @@ function wajdExtrasAuthorPhoto() {
   });
 }
 
-/* ---------- End of article: follow Wajd (Telegram channel + install as an app) ---------- */
-const WAJD_TELEGRAM = 'https://t.me/WajdCh';
-function wajdExtrasFollowCard() {
-  if (!document.body.classList.contains('post') || document.querySelector('.wajd-follow-card')) return;
-  const like = document.getElementById('wajd-like-panel');
-  if (!like || !like.parentNode) return;
-  const card = document.createElement('section');
-  card.className = 'wajd-follow-card';
-  card.setAttribute('aria-label', 'تابع وَجْد');
-  const install = wajdExtrasStandalone() ? '' : '<button data-follow-install type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M12 8v6M9.5 11.5 12 14l2.5-2.5"/></svg>ثبّت وَجْد على هاتفك</button>';
-  card.innerHTML = '<div><strong>أعجبتك الكتابة؟ تابع وَجْد</strong><small>تصلك الكتابات الجديدة أولًا بأول على قناة تيليجرام.</small></div>'
-    + '<div class="wajd-follow-actions"><a href="' + WAJD_TELEGRAM + '" rel="noopener" target="_blank"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M21 4 3 11l6 2 2 6 3-4 5 4z"/></svg>قناة تيليجرام</a>' + install + '</div>';
-  const button = card.querySelector('[data-follow-install]');
-  if (button) button.addEventListener('click', wajdExtrasInstallSheet);
-  like.parentNode.insertBefore(card, like.nextSibling);
+/* ---------- End of article: one share button beside like and save ---------- */
+function wajdExtrasShareButton() {
+  const panel = document.getElementById('wajd-like-panel');
+  if (!document.body.classList.contains('post') || !panel || panel.querySelector('.wajd-share-button')) return;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'wajd-like-button wajd-share-button';
+  button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12M7 8l5-5 5 5M5 14v5h14v-5"/></svg><span>مشاركة</span>';
+  button.addEventListener('click', async () => {
+    const url = panel.dataset.postUrl || location.href.split('?')[0];
+    const title = (panel.dataset.postTitle || document.title).trim();
+    if (navigator.share) { try { await navigator.share({ title, url }); } catch (error) {} return; }
+    try { await navigator.clipboard.writeText(url); wajdExtrasToast('نُسخ رابط المقال'); } catch (error) { window.prompt('انسخ رابط المقال', url); }
+  });
+  panel.appendChild(button);
 }
 
 /* ---------- Footer: topics and site links ---------- */
@@ -326,7 +328,7 @@ try { wajdExtrasAuthorPhoto(); } catch (error) {}
 try { wajdExtrasHome(); } catch (error) { console.warn('Wajd home extras:', error); }
 try { wajdExtrasQuotes(); } catch (error) { console.warn('Wajd quote sharing:', error); }
 try { wajdExtrasInstall(); } catch (error) { console.warn('Wajd install:', error); }
-try { wajdExtrasFollowCard(); } catch (error) { console.warn('Wajd follow card:', error); }
+try { wajdExtrasShareButton(); } catch (error) { console.warn('Wajd share button:', error); }
 try { wajdExtrasFooter(); } catch (error) { console.warn('Wajd footer:', error); }
 try { wajdExtrasNotFound(); } catch (error) { console.warn('Wajd 404:', error); }
 wajdExtrasReadingTimes().catch(error => console.warn('Wajd reading times:', error));
