@@ -8,15 +8,13 @@ const WAJD_ARCHIVE_CSS = `
 .wajd-archive-rhythm{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}
 .wajd-archive-cell{display:grid;gap:5px;justify-items:stretch;padding:0;border:0;background:none;cursor:pointer;font-family:Tajawal,sans-serif}
 .wajd-archive-cell i{display:flex;align-items:center;justify-content:center;height:34px;border-radius:9px;border:1px solid var(--wajd-line);color:var(--wajd-ink);font-style:normal;font-size:13px;font-weight:700}
-.wajd-archive-cell span{overflow:hidden;color:var(--wajd-muted);font-size:11.5px;text-align:center;white-space:nowrap}
-.wajd-archive-cell .is-name{display:none}
+.wajd-archive-cell span{overflow:hidden;font-weight:600;color:var(--wajd-muted);font-size:11.5px;text-align:center;white-space:nowrap}
 .wajd-archive-cell[disabled]{cursor:default;opacity:.45}
 .wajd-archive-cell[data-heat="1"] i{background:rgba(149,83,64,.14);border-color:transparent}
 .wajd-archive-cell[data-heat="2"] i{background:rgba(149,83,64,.30);border-color:transparent}
 .wajd-archive-cell[data-heat="3"] i{background:rgba(149,83,64,.62);border-color:transparent;color:#fff}
 .wajd-archive-cell[data-heat="4"] i{background:#8a4b39;border-color:transparent;color:#fff}
 .wajd-archive-cell:not([disabled]):hover i{outline:2px solid var(--wajd-accent);outline-offset:1px}
-@media(min-width:760px){.wajd-archive-cell .is-name{display:inline}.wajd-archive-cell .is-number{display:none}}
 .wajd-archive-section{scroll-margin-top:96px;overflow:hidden;border:1px solid var(--wajd-line);border-radius:16px;background:var(--wajd-paper)}
 .wajd-archive-section>h4{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0;padding:14px 20px;border-bottom:1px solid var(--wajd-line);color:var(--wajd-ink);font-size:17px;font-weight:800}
 .wajd-archive-section>h4 small{color:var(--wajd-muted);font-size:12.5px;font-weight:600}
@@ -110,10 +108,7 @@ body.dark-mode .wajd-archive-cell[data-heat="4"] i{background:#c9866b;color:#1e1
       cell.setAttribute('aria-label', label);
       cell.title = label;
       cell.appendChild(make('i', '', count ? number.format(count) : ''));
-      const caption = make('span', '');
-      caption.appendChild(make('b', 'is-name', monthName(month)));
-      caption.appendChild(make('b', 'is-number', number.format(month + 1)));
-      cell.appendChild(caption);
+      cell.appendChild(make('span', '', monthName(month)));
       cell.addEventListener('click', () => {
         const target = document.getElementById('wajd-month-' + month);
         if (target) target.scrollIntoView({ behavior:'smooth', block:'start' });
