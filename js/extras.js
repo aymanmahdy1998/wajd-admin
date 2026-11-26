@@ -11,16 +11,32 @@ const WAJD_EXTRAS_CSS = `
 body.post .hideensa .post-tags,body.post .hideensa .pSh,body.post .hideensa .page-navigation,body.post .wajd-next-reading-note,body.post .wajd-next-secondary{display:none!important}
 body.post .wajd-article-path[data-has-next] ~ .wajd-next-reading{display:none!important}
 body.post .commentsection ~ .wajd-article-path{margin-top:20px}
-body.post .wajd-next-reading-grid{grid-template-columns:minmax(0,1fr)!important}
 body.post .wajd-like-panel{display:flex!important;flex-direction:row!important;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px!important;padding:14px!important}
 body.post .wajd-like-panel .wajd-reader-action{display:contents}
 body.post .wajd-like-panel .wajd-like-copy{display:none!important}
 body.post .wajd-like-panel .wajd-like-button{width:auto!important;min-width:84px!important;margin:0!important;padding-inline:14px!important}
 @media(max-width:420px){body.post .wajd-like-panel{flex-wrap:nowrap!important;gap:8px!important;padding:12px 8px!important}body.post .wajd-like-panel .wajd-like-button{min-width:0!important;padding-inline:12px!important}}
 body.post .wajd-like-panel .wajd-like-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-body.post .wajd-next-path-visual{display:none!important}
-body.post .wajd-next-primary{grid-template-columns:minmax(0,1fr)!important;min-height:0!important}
 body.post .wajd-share-button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* v124: «خطوتك التالية» is one short full-width row (the problem was its height, not its width). */
+body.post .wajd-next-reading.RelatedPosts{padding:0!important;min-height:0!important;margin:14px 0 20px!important;border:0!important;background:transparent!important;box-shadow:none!important;overflow:hidden}
+body.post .wajd-next-reading::before,body.post .wajd-next-reading::after{content:none!important}
+body.post .wajd-next-reading > .headline{display:none!important}
+body.post .wajd-next-reading .PostByCat,body.post .wajd-next-reading .posts-from{min-height:0!important;margin:0!important}
+body.post .wajd-next-reading .wajd-next-reading-grid{display:block!important;width:100%!important;max-width:none!important;margin:0!important}
+body.post .wajd-next-reading article.wajd-next-primary{display:flex!important;flex-direction:row!important;align-items:center;gap:14px;width:100%!important;max-width:none!important;min-height:0!important;margin:0!important;padding:12px 16px!important;border-radius:14px!important;box-shadow:none!important}
+body.post .wajd-next-reading article.wajd-next-primary::before,body.post .wajd-next-reading article.wajd-next-primary::after{content:none!important}
+body.post .wajd-next-reading .wajd-next-path-visual,body.post .wajd-next-reading .wajd-next-summary,body.post .wajd-next-reading .wajd-next-path-progress,body.post .wajd-next-reading .wajd-card-labels{display:none!important}
+body.post .wajd-next-reading article.wajd-next-primary .Img-Holder{flex:0 0 64px;width:64px!important;height:64px!important;min-height:0!important;margin:0!important;padding:0!important;border-radius:10px;overflow:hidden}
+body.post .wajd-next-reading article.wajd-next-primary .Img-Holder img{width:100%!important;height:100%!important;object-fit:cover;position:static!important}
+body.post .wajd-next-reading .wajd-next-primary-copy{display:grid!important;flex:1;min-width:0;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:14px;row-gap:2px;padding:0!important;text-align:start}
+body.post .wajd-next-reading .wajd-next-kicker{grid-column:1;display:block!important;margin:0!important;font-size:12px!important;line-height:1.6!important}
+body.post .wajd-next-reading .wajd-next-kicker::before{content:'خطوتك التالية — '!important;display:inline!important;position:static!important;width:auto!important;height:auto!important;background:none!important}
+body.post .wajd-next-reading .wajd-next-kicker::after{content:none!important}
+body.post .wajd-next-reading .wajd-next-primary-copy .rnav-title{grid-column:1;margin:0!important;font-size:16px!important;line-height:1.6!important}
+body.post .wajd-next-reading .wajd-next-primary-copy .rnav-title,body.post .wajd-next-reading .wajd-next-primary-copy .rnav-title a{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+body.post .wajd-next-reading .wajd-next-action{grid-column:2;grid-row:1 / span 2;margin:0!important;white-space:nowrap;padding:9px 16px!important;font-size:13px!important}
+@media(max-width:560px){body.post .wajd-next-reading article.wajd-next-primary.is-article{align-items:flex-start;gap:12px;padding:12px!important}body.post .wajd-next-reading article.is-article .wajd-next-primary-copy{grid-template-columns:minmax(0,1fr)}body.post .wajd-next-reading article.is-article .wajd-next-action{grid-column:1;grid-row:auto;justify-self:start;margin-top:6px!important;padding:6px 14px!important}}
 .wajd-footer-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 40px;margin:18px 0 6px}
 .wajd-footer-links h4{margin:0 0 8px;color:#f3e6da;font:700 14px Tajawal,sans-serif;opacity:.75}
 .wajd-footer-links a,.wajd-footer-links button{display:block;padding:4px 0;border:0;background:none;color:#f7f3ec!important;font:500 14.5px/1.6 Tajawal,sans-serif;text-align:start;text-decoration:none;cursor:pointer;opacity:.9}
