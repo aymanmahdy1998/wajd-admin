@@ -331,7 +331,8 @@ function wajdExtrasNotFound() {
 function wajdExtrasEndOrder() {
   if (!document.body.classList.contains('post')) return;
   const comments = document.querySelector('.post .commentsection');
-  const next = document.querySelector('.post .wajd-next-reading');
+  // .RelatedPosts is in the page from the start; the .wajd-next-reading class is only added once it loads.
+  const next = document.querySelector('.post .hideensa .RelatedPosts');
   if (!comments || !next) return;
   const box = document.getElementById('wajd-article-path');
   if (box && comments.nextElementSibling !== box) comments.insertAdjacentElement('afterend', box);
