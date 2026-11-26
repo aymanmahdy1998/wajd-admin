@@ -3017,7 +3017,8 @@ async function wajdInitializeSavedWritings() {
     const needsHistoryOnStart = Boolean(
       wajdCurrentPostId ||
       document.getElementById('wajd-reading-paths') ||
-      (route && (route.searchParams.has('reading-path') || route.searchParams.has('wajdPath')))
+      document.querySelector('.ArchivePage') ||
+      (route &&(route.searchParams.has('reading-path') || route.searchParams.has('wajdPath')))
     );
     if (registeredReader) try {
       await window.wajdEnsureReaderLists({ history:needsHistoryOnStart, saved:Boolean(wajdCurrentPostId) });
@@ -3039,7 +3040,15 @@ async function wajdInitializeSavedWritings() {
       wajdSavedIds.clear(); wajdHistoryIds.clear(); wajdHistoryDetails.clear();
       wajdSavedListLoaded = false; wajdHistoryListLoaded = false;
     }
-    const wajdPostGrid = document.querySelector('#Blog1 .Posts-byCategory');
+    // v121: the archive page redraws its rows on every year change or search, so watch it too.
+const wajdArchiveRoot = document.querySelector('.ArchivePage');
+if (wajdArchiveRoot) {
+  new MutationObserver(mutations => mutations.forEach(mutation => mutation.addedNodes.forEach(node => {
+    if (node.nodeType === 1) wajdHistoryMarkCards(node);
+  }))).observe(wajdArchiveRoot, { childList: true, subtree: true });
+  wajdHistoryMarkCards(wajdArchiveRoot);
+}
+const wajdPostGrid = document.querySelector('#Blog1 .Posts-byCategory');
     if (wajdPostGrid) {
       new MutationObserver(mutations => mutations.forEach(mutation => mutation.addedNodes.forEach(node => {
         if (node.nodeType === 1) wajdHistoryMarkCards(node);
