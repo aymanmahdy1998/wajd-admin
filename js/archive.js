@@ -4,7 +4,8 @@
 
 const WAJD_ARCHIVE_CSS = `
 .wajd-archive-year{cursor:pointer}
-.wajd-archive-year-heading small{margin-inline-start:12px;color:var(--wajd-muted);font:600 13.5px Tajawal,sans-serif}
+.wajd-archive-year-heading{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+.wajd-archive-year-heading small{color:var(--wajd-muted);font:600 13.5px Tajawal,sans-serif;unicode-bidi:isolate}
 .wajd-archive-section{overflow:hidden;border:1px solid var(--wajd-line);border-radius:16px;background:var(--wajd-paper)}
 .wajd-archive-section>h4{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0;padding:14px 20px;border-bottom:1px solid var(--wajd-line);color:var(--wajd-ink);font-size:17px;font-weight:800}
 .wajd-archive-section>h4 small{color:var(--wajd-muted);font-size:12.5px;font-weight:600}
