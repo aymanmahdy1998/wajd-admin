@@ -14,7 +14,8 @@ body.post .wajd-next-reading-grid{grid-template-columns:minmax(0,1fr)!important}
 body.post .wajd-like-panel{display:flex!important;flex-direction:row!important;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px!important;padding:14px!important}
 body.post .wajd-like-panel .wajd-reader-action{display:contents}
 body.post .wajd-like-panel .wajd-like-copy{display:none!important}
-body.post .wajd-like-panel .wajd-like-button{width:auto!important;min-width:96px;margin:0!important}
+body.post .wajd-like-panel .wajd-like-button{width:auto!important;min-width:84px!important;margin:0!important;padding-inline:14px!important}
+@media(max-width:420px){body.post .wajd-like-panel{flex-wrap:nowrap!important;gap:8px!important;padding:12px 8px!important}body.post .wajd-like-panel .wajd-like-button{min-width:0!important;padding-inline:12px!important}}
 body.post .wajd-like-panel .wajd-like-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 body.post .wajd-next-path-visual{display:none!important}
 body.post .wajd-next-primary{grid-template-columns:minmax(0,1fr)!important;min-height:0!important}
