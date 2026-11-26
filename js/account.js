@@ -455,7 +455,9 @@ function wajdReadingSetup(){
       const y=window.scrollY,dy=y-toolbarLastY;if(Math.abs(dy)<6)return;toolbarLastY=y;
       const textEnded=body.getBoundingClientRect().bottom<window.innerHeight;
       const pickerOpen=fontPicker&&fontPicker.classList.contains('is-open');
-      readingToolbar.classList.toggle('is-tucked',narrow.matches&&dy>0&&y>240&&!textEnded&&!pickerOpen);
+      // v122: once the article text is well behind, the font tools have no use and only cover the end.
+      const pastText=body.getBoundingClientRect().bottom<window.innerHeight*.45;
+      readingToolbar.classList.toggle('is-tucked',narrow.matches&&!pickerOpen&&(pastText||(dy>0&&y>240&&!textEnded)));
     },{passive:true});
   }
   const text=(body.innerText||body.textContent||'').trim();

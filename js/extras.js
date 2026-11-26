@@ -11,11 +11,13 @@ const WAJD_EXTRAS_CSS = `
 body.post .hideensa .post-tags,body.post .hideensa .pSh,body.post .hideensa .page-navigation,body.post .wajd-next-reading-note,body.post .wajd-next-secondary{display:none!important}
 body.post .wajd-article-path[data-has-next] ~ .hideensa .wajd-next-reading{display:none!important}
 body.post .wajd-next-reading-grid{grid-template-columns:minmax(0,1fr)!important}
-body.post .wajd-like-panel{display:flex!important;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px!important;padding:14px!important}
+body.post .wajd-like-panel{display:flex!important;flex-direction:row!important;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px!important;padding:14px!important}
 body.post .wajd-like-panel .wajd-reader-action{display:contents}
 body.post .wajd-like-panel .wajd-like-copy{display:none!important}
 body.post .wajd-like-panel .wajd-like-button{width:auto!important;min-width:96px;margin:0!important}
 body.post .wajd-like-panel .wajd-like-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+body.post .wajd-next-path-visual{display:none!important}
+body.post .wajd-next-primary{grid-template-columns:minmax(0,1fr)!important;min-height:0!important}
 body.post .wajd-share-button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .wajd-footer-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 40px;margin:18px 0 6px}
 .wajd-footer-links h4{margin:0 0 8px;color:#f3e6da;font:700 14px Tajawal,sans-serif;opacity:.75}
