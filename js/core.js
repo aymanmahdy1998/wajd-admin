@@ -750,10 +750,11 @@ function wajdHistoryUpdateClear() {
 
 function wajdHistoryMarkCards(root) {
   const scope = root && root.querySelectorAll ? root : document;
-  scope.querySelectorAll('article.posts[data-post-id]').forEach(card => {
+  // v121: archive rows (js/archive.js) get the same read mark as post cards.
+  scope.querySelectorAll('article.posts[data-post-id],.wajd-archive-item[data-post-id]').forEach(card => {
     card.classList.toggle('wajd-is-read', wajdHistoryIds.has(card.dataset.postId));
   });
-  if (scope.matches && scope.matches('article.posts[data-post-id]')) {
+  if (scope.matches && scope.matches('article.posts[data-post-id],.wajd-archive-item[data-post-id]')) {
     scope.classList.toggle('wajd-is-read', wajdHistoryIds.has(scope.dataset.postId));
   }
 }
