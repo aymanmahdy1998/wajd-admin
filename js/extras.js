@@ -38,7 +38,6 @@ body.post .wajd-next-reading .wajd-next-primary-copy .rnav-title,body.post .wajd
 body.post .wajd-next-reading .wajd-next-action{grid-column:2;grid-row:1 / span 2;margin:0!important;white-space:nowrap;padding:9px 16px!important;font-size:13px!important}
 @media(max-width:560px){body.post .wajd-next-reading article.wajd-next-primary.is-article{align-items:flex-start;gap:12px;padding:12px!important}body.post .wajd-next-reading article.is-article .wajd-next-primary-copy{grid-template-columns:minmax(0,1fr)}body.post .wajd-next-reading article.is-article .wajd-next-action{grid-column:1;grid-row:auto;justify-self:start;margin-top:6px!important;padding:6px 14px!important}}
 .wajd-section-total{display:inline-block;margin-inline-start:14px;color:var(--wajd-muted);font:600 13.5px/1.6 Tajawal,sans-serif;white-space:nowrap;vertical-align:middle;unicode-bidi:isolate}
-.wajd-section-count{display:none!important}
 .wajd-footer-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 40px;margin:18px 0 6px}
 .wajd-footer-links h4{margin:0 0 8px;color:#f3e6da;font:700 14px Tajawal,sans-serif;opacity:.75}
 .wajd-footer-links a,.wajd-footer-links button{display:block;padding:4px 0;border:0;background:none;color:#f7f3ec!important;font:500 14.5px/1.6 Tajawal,sans-serif;text-align:start;text-decoration:none;cursor:pointer;opacity:.9}

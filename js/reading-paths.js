@@ -58,14 +58,6 @@ async function wajdPathsLoadPublic(){
   wajdPathsScheduleRender();
   return wajdPathsPublic;
 }
-async function wajdPathsLoadPublicLegacy(){
-  const routeKey=wajdPathsRouteKey(),cachedRouteMissing=wajdPathsHasRoute()&&routeKey!=='all'&&!wajdPathsPublic.some(path=>String(path.slug||path.id)===routeKey||String(path.id)===routeKey);
-  if(wajdPathsPublicCacheFresh&&!cachedRouteMissing)return Promise.resolve(wajdPathsPublic);
-  if(cachedRouteMissing)wajdPathsPublicCacheFresh=false;
-  if(wajdPathsPublicPromise)return wajdPathsPublicPromise;
-  wajdPathsPublicPromise=(async()=>{try{await wajdPathsInitialize();const snap=await getDocs(query(collection(wajdPathsDb,'readingPaths'),where('status','==','published')));wajdPathsPublic=wajdPathsSorted(wajdPathsSyncCurrentTitles(snap.docs.map(item=>({id:item.id,...item.data()}))));wajdPathsWritePublicCache(wajdPathsPublic);}catch(error){console.warn('Wajd reading paths fallback:',error);}wajdPathsPublicReady=true;wajdPathsScheduleRender();return wajdPathsPublic;})();
-  return wajdPathsPublicPromise;
-}
 /* v119: articles completed in this browser (any reader, signed in or not),
    recorded by core.js. Signed-in readers also get their cloud history below. */
 function wajdPathsLoadLocalCompleted(uid){try{const urls=JSON.parse(localStorage.getItem('wajd-completed-urls-v119:'+uid)||'[]');if(Array.isArray(urls))urls.forEach(url=>{if(typeof url==='string'&&url)wajdPathsCompleted.add(wajdPathsNormalize(url));});}catch(error){}}

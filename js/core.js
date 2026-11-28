@@ -1,3 +1,5 @@
+import { wajdIsAdminEmail } from './admin-id.js';
+
 /* WAJD v114: record a tiny local page-entry envelope before quota-aware analytics starts.
    It is acknowledged by the detailed journey write, or recovered on the next visit. */
 /* Blogger writes Arabic marks (shadda, ؟, ،) inside JSON-LD as HTML entities such as &#1617;, which
@@ -150,7 +152,6 @@ const wajdSavedFirebaseConfig = {
   messagingSenderId: '893942775371',
   appId: '1:893942775371:web:2a78617b83ed80e70cd7ce'
 };
-const WAJD_ADMIN_EMAIL = 'aymanmahdy1996@gmail.com';
 
 window.wajdFirebaseModulesPromise = Promise.resolve({
   initializeApp, getApp, getApps,
@@ -1017,7 +1018,7 @@ function wajdAccountEmailValue(user) {
 }
 
 function wajdIsAdmin(user) {
-  return wajdAccountIsGoogle(user) && WAJD_ADMIN_EMAIL.indexOf('__') !== 0 && wajdAccountEmailValue(user) === WAJD_ADMIN_EMAIL.toLowerCase();
+  return wajdAccountIsGoogle(user) && wajdIsAdminEmail(wajdAccountEmailValue(user));
 }
 
 function wajdNotificationTime(value) {
@@ -2555,7 +2556,7 @@ function wajdAdminExposeBridge() {
     db: () => wajdSavedDb,
     user: () => wajdSavedUser,
     number: wajdSavedArabicNumber,
-    constants: Object.freeze({ WAJD_ADMIN_EMAIL, WAJD_AUDIENCE_SESSION_TIMEOUT, WAJD_JOURNEY_COLLECTION }),
+    constants: Object.freeze({ WAJD_AUDIENCE_SESSION_TIMEOUT, WAJD_JOURNEY_COLLECTION }),
     dom: Object.freeze({ wajdAdminOpen, wajdAdminOverlay, wajdAdminClose, wajdAdminRefresh, wajdAdminContent }),
     fn: Object.freeze({ wajdIsAdmin, wajdSavedShowToast, wajdSavedPostId, wajdSavedPostUrl, wajdSavedGetFeed, wajdNotificationSafeUrl, wajdAccountFallbackAvatar })
   });

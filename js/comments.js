@@ -1,5 +1,5 @@
 const { collection, deleteDoc, doc, enableNetwork, getDoc, getDocFromServer, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, waitForPendingWrites, where, writeBatch } = await window.wajdFirebaseModulesPromise;
-const WAJD_COMMENTS_ADMIN_EMAIL = 'aymanmahdy1996@gmail.com';
+import { wajdIsAdminEmail } from './admin-id.js';
 const wajdCommentsArabicNumber = new Intl.NumberFormat('ar-EG');
 const wajdCommentsRoot = document.getElementById('wajd-comments');
 const wajdCommentsLegacyPostId = wajdCommentsRoot ? wajdCommentsRoot.dataset.postId : '';
@@ -112,7 +112,7 @@ function wajdCommentsEmail(user) {
 }
 
 function wajdCommentsIsAdmin(user) {
-  return wajdCommentsIsGoogle(user) && wajdCommentsEmail(user) === WAJD_COMMENTS_ADMIN_EMAIL;
+  return wajdCommentsIsGoogle(user) && wajdIsAdminEmail(wajdCommentsEmail(user));
 }
 
 function wajdCommentsFallbackAvatar(name) {

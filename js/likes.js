@@ -1,3 +1,4 @@
+import { wajdIsAdminEmail } from './admin-id.js';
 const { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, serverTimestamp, setDoc } = await window.wajdFirebaseModulesPromise;
 
 const wajdArabicNumber = new Intl.NumberFormat('ar-EG');
@@ -78,7 +79,7 @@ async function wajdInitializeLikes() {
 
   async function wajdPublishLikeNotification(nextCount) {
     const userEmail = String(user.email || ((user.providerData || []).find(item => item && item.providerId === 'google.com') || {}).email || '').toLowerCase();
-    if (userEmail === 'aymanmahdy1996@gmail.com') return;
+    if (wajdIsAdminEmail(userEmail)) return;
     const existing = await getDoc(likeNotificationRef);
     if (existing.exists()) {
       await setDoc(likeNotificationRef, { count:nextCount, updatedAt:serverTimestamp(), read:false }, { merge:true });

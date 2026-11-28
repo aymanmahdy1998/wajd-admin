@@ -2,6 +2,7 @@
    يُحمَّل هذا الملف فقط بعد التأكد من أن الحساب المسجَّل هو حساب المدير.
    القرّاء لا ينزّلون شيئًا منه. لا تضع فيه أي سرّ: الحماية الحقيقية في قواعد Firestore.
    This file is loaded by the theme with import() only for the admin account. */
+import { wajdIsAdminEmail } from './js/admin-id.js';
 const B = window.wajdAdminBridge;
 if (!B) throw new Error('wajd-admin-bridge-missing');
 const {
@@ -12,7 +13,7 @@ const wajdSavedDb = B.db();
 const wajdSavedArabicNumber = B.number;
 const wajdAdminCurrentUser = () => B.user();
 const { wajdIsAdmin, wajdSavedShowToast, wajdSavedPostId, wajdSavedPostUrl, wajdSavedGetFeed, wajdNotificationSafeUrl, wajdAccountFallbackAvatar } = B.fn;
-const { WAJD_ADMIN_EMAIL, WAJD_AUDIENCE_SESSION_TIMEOUT, WAJD_JOURNEY_COLLECTION } = B.constants;
+const { WAJD_AUDIENCE_SESSION_TIMEOUT, WAJD_JOURNEY_COLLECTION } = B.constants;
 const { wajdAdminContent, wajdAdminRefresh } = B.dom;
 
 
@@ -255,7 +256,7 @@ function wajdAdminCommentRow(item, compact) {
   let actions = '<a class="wajd-admin-action" href="' + wajdAdminEscape(wajdAdminCommentUrl(item)) + '" target="_blank">فتح</a>';
   if (!compact) {
     actions += '<button class="wajd-admin-action" data-admin-action="' + (hidden ? 'show-comment' : 'hide-comment') + '" data-comment-id="' + item.id + '" data-comment-scope="' + item.scopeId + '" type="button">' + (hidden ? 'إظهار' : 'إخفاء') + '</button>';
-    if (ownerId && !(profile && profile.email === WAJD_ADMIN_EMAIL)) {
+    if (ownerId && !(profile && wajdIsAdminEmail(profile.email))) {
       const blocked = wajdAdminData.blocks.has(ownerId) && wajdAdminData.blocks.get(ownerId).untilMs > Date.now();
       actions += '<button class="wajd-admin-action" data-admin-action="' + (blocked ? 'unblock-reader' : 'block-reader') + '" data-reader-id="' + ownerId + '" data-block-days="7" type="button">' + (blocked ? 'رفع الحظر' : 'حظر ٧ أيام') + '</button>';
     }
@@ -440,7 +441,7 @@ function wajdAdminIsRegisteredUserId(userId) {
   const id = String(userId || '');
   if (!id || !wajdAdminData || !wajdAdminData.profilesById) return false;
   const profile = wajdAdminData.profilesById.get(id);
-  return wajdAdminIsGoogleProfile(profile) && String(profile.email || '').trim().toLowerCase() !== WAJD_ADMIN_EMAIL.toLowerCase();
+  return wajdAdminIsGoogleProfile(profile) && !wajdIsAdminEmail(profile.email);
 }
 
 function wajdAdminBehaviorValueMillis(value) {
@@ -467,7 +468,7 @@ function wajdAdminBehaviorData() {
   const sessions = (wajdAdminData.audienceSessions || []).filter(item => {
     if (!item || !item.userId || !item.data) return false;
     const profile = wajdAdminData.profilesById && wajdAdminData.profilesById.get(item.userId);
-    if (profile && profile.email === WAJD_ADMIN_EMAIL) return false;
+    if (profile && wajdIsAdminEmail(profile.email)) return false;
     const time = wajdAdminBehaviorSessionMillis(item);
     return time >= cutoff && time <= now;
   });
@@ -626,7 +627,7 @@ async function wajdAdminJourneyLoad(reset, force) {
       const userId = original.userId;
       const data = original;
       const profile = wajdAdminData.profilesById.get(userId);
-      if (profile && profile.email === WAJD_ADMIN_EMAIL) return;
+      if (profile && wajdIsAdminEmail(profile.email)) return;
       state.rows.push({id:item.id,data}); seen.add(item.id);
     });
     state.cursor = docs.length ? docs[docs.length-1] : state.cursor;
@@ -1084,7 +1085,7 @@ async function wajdAdminLoad(options) {
     const profiles = rawProfiles.filter(item => wajdAdminIsGoogleProfile(item.data));
     profiles.sort((a,b) => wajdAdminTimestamp(b.data,'lastSeenAt')-wajdAdminTimestamp(a.data,'lastSeenAt'));
     const profilesById = new Map(profiles.map(item => [item.id,item.data]));
-    const registeredGoogleIds = new Set(profiles.filter(item => String(item.data.email || '').trim().toLowerCase() !== WAJD_ADMIN_EMAIL.toLowerCase()).map(item => item.id));
+    const registeredGoogleIds = new Set(profiles.filter(item => !wajdIsAdminEmail(item.data.email)).map(item => item.id));
     window.wajdAdminRegisteredGoogleIds = registeredGoogleIds;
     const legacyAnonymousById = new Map();
     anonymousVisitorsSnapshot.forEach(item => legacyAnonymousById.set(item.id,item.data()));
@@ -1096,7 +1097,7 @@ async function wajdAdminLoad(options) {
     const interactionEvidenceByUser = new Map();
     const addInteractionEvidence = (userId, millis, kind) => {
       userId = String(userId || '');
-      if (!userId || (profilesById.has(userId) && profilesById.get(userId).email === WAJD_ADMIN_EMAIL)) return;
+      if (!userId || (profilesById.has(userId) && wajdIsAdminEmail(profilesById.get(userId).email))) return;
       millis = Number(millis) || 0;
       const current = interactionEvidenceByUser.get(userId) || { firstMillis:0, lastMillis:0, kinds:new Set() };
       if (millis > 0) {
@@ -1134,12 +1135,12 @@ async function wajdAdminLoad(options) {
     });
     audienceSessionsByUser.forEach(items => items.sort((a,b) => wajdAdminTimestamp(b.data,'lastSeenAt') - wajdAdminTimestamp(a.data,'lastSeenAt') || wajdAdminTimestamp(b.data,'startedAt') - wajdAdminTimestamp(a.data,'startedAt')));
     const audienceById = new Map();
-    profiles.filter(item => String(item.data.email || '').trim().toLowerCase() !== WAJD_ADMIN_EMAIL.toLowerCase()).forEach(item => audienceById.set(item.id,{ id:item.id, readerType:'registered', profile:item.data, analytics:null, firstSeenAt:item.data.createdAt, lastSeenAt:item.data.lastSeenAt }));
+    profiles.filter(item => !wajdIsAdminEmail(item.data.email)).forEach(item => audienceById.set(item.id,{ id:item.id, readerType:'registered', profile:item.data, analytics:null, firstSeenAt:item.data.createdAt, lastSeenAt:item.data.lastSeenAt }));
     legacyAnonymousById.forEach((data,id) => {
       if (!audienceById.has(id)) audienceById.set(id,{ id, readerType:'anonymous', profile:null, analytics:null, firstSeenAt:data.firstSeenAt, lastSeenAt:data.lastSeenAt });
     });
     audienceAnalyticsById.forEach((data,id) => {
-      if (profilesById.has(id) && String(profilesById.get(id).email || '').trim().toLowerCase() === WAJD_ADMIN_EMAIL.toLowerCase()) return;
+      if (profilesById.has(id) && wajdIsAdminEmail(profilesById.get(id).email)) return;
       const googleProfile = profilesById.get(id) || null;
       const current = audienceById.get(id) || { id, readerType:googleProfile ? 'registered' : 'anonymous', profile:googleProfile };
       // Never trust data.readerType here: old analytics may contain stale labels.
