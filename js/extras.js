@@ -360,7 +360,8 @@ function wajdExtrasEndOrder() {
 /* ---------- Category pages: «عدد الكتابات» beside the section title (not in the nav bar) ---------- */
 async function wajdExtrasSectionTotal() {
   const match = location.pathname.match(/^\/search\/label\/([^/]+)/);
-  const title = match && document.querySelector('#Blog1 .headline .title, .headline h1.title');
+  // «سؤال وجواب» has its own hero instead of the normal section heading.
+  const title = match && (document.querySelector('.wajd-qa-title') || document.querySelector('#Blog1 .headline .title, .headline h1.title'));
   if (!title || title.parentElement.querySelector('.wajd-section-total')) return;
   // max-results=0 returns only the total, so no posts are downloaded.
   const response = await fetch('/feeds/posts/summary/-/' + encodeURIComponent(decodeURIComponent(match[1])) + '?alt=json&max-results=0');
